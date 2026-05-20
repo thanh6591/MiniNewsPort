@@ -21,5 +21,6 @@
         <p class="mt-2 text-sm text-slate-600">Input validation and specific HTTP status behavior for create/edit news.</p>
       </NuxtLink>
     </div>
+    
   </section>
 </template>
