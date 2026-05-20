@@ -1,7 +1,7 @@
 {
   "buildCommand": "pnpm --dir apps/web build",
   "installCommand": "pnpm install --frozen-lockfile",
-  "outputDirectory": ".vercel/output",
+  "outputDirectory": "apps/web/.vercel/output",
   "framework": "nuxtjs",
   "env": {
     "NITRO_PRESET": "vercel"
