@@ -7,6 +7,16 @@ export default defineEventHandler(() => {
       description: "API for managing news categories, articles, and admin functions"
     },
     paths: {
+      "/api/health": {
+        get: {
+          tags: ["Ops"],
+          summary: "Health check for DB connectivity and migration state",
+          responses: {
+            "200": { description: "Service is healthy" },
+            "503": { description: "Service is unhealthy (DB or migration issue)" }
+          }
+        }
+      },
       "/api/categories": {
         get: {
           tags: ["Public"],
