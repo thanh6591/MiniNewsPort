@@ -49,6 +49,10 @@ const categorySeeds: CategorySeedConfig[] = [
   }
 ];
 
+const postsPerCategory: Record<string, number> = {
+  business: 100
+};
+
 function buildCategoryPost(config: CategorySeedConfig, itemNumber: number, categoryId: number, sequence: number): typeof news.$inferInsert {
   const topic = config.topics[(itemNumber - 1) % config.topics.length];
   const title = `${config.name}: ${topic} insight #${itemNumber}`;
@@ -96,9 +100,9 @@ async function seed() {
     .orderBy(categories.id);
   const categoryIdBySlug = new Map<string, number>(allCategories.map((item) => [item.slug, item.id]));
 
-  const publishedPerCategory = 30;
   let sequence = 0;
   const newsRows: Array<typeof news.$inferInsert> = [];
+  const seededCounts: Array<{ slug: string; count: number }> = [];
 
   for (const category of categorySeeds) {
     const categoryId = categoryIdBySlug.get(category.slug);
@@ -107,7 +111,10 @@ async function seed() {
       throw new Error(`Category not found after seeding: ${category.slug}`);
     }
 
-    for (let i = 1; i <= publishedPerCategory; i += 1) {
+    const postsToCreate = postsPerCategory[category.slug] ?? 30;
+    seededCounts.push({ slug: category.slug, count: postsToCreate });
+
+    for (let i = 1; i <= postsToCreate; i += 1) {
       sequence += 1;
       newsRows.push(buildCategoryPost(category, i, categoryId, sequence));
     }
@@ -132,7 +139,8 @@ async function seed() {
     }))
   );
 
-  console.log(`Seed completed: ${allCategories.length} categories, ${publishedNews.length} published posts (${publishedPerCategory} per category).`);
+  const seededSummary = seededCounts.map((item) => `${item.slug}:${item.count}`).join(", ");
+  console.log(`Seed completed: ${allCategories.length} categories, ${publishedNews.length} published posts (${seededSummary}).`);
 }
 
 seed().catch((error) => {
