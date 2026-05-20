@@ -1,5 +1,5 @@
 {
-  "buildCommand": "pnpm build && pnpm db:migrate",
+  "buildCommand": "pnpm build && pnpm db:migrate && pnpm db:seed",
   "env": {
     "NITRO_PRESET": "vercel"
   }
