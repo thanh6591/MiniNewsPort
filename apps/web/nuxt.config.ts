@@ -5,7 +5,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   ssr: true,
   nitro: {
-    preset: process.env.NITRO_PRESET || "node-server"
+    preset: process.env.NITRO_PRESET || (process.env.VERCEL ? "vercel" : "node-server")
   },
   modules: ["@pinia/nuxt", "@nuxtjs/tailwindcss"],
   css: ["~/assets/css/main.css"],
