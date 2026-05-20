@@ -6,5 +6,5 @@
 
 ## 2. Validate and Roll Out
 
-- [ ] 2.1 Run typecheck to ensure no regressions from seed changes
-- [ ] 2.2 Deploy and verify production API data counts reflect new sample volume
+- [x] 2.1 Run typecheck to ensure no regressions from seed changes
+- [x] 2.2 Deploy and verify production API data counts reflect new sample volume
