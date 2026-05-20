@@ -1,6 +1,0 @@
-{
-  "buildCommand": "cd apps/web && pnpm build",
-  "outputDirectory": "apps/web/.output",
-  "devCommand": "cd apps/web && pnpm dev",
-  "installCommand": "pnpm install"
-}
