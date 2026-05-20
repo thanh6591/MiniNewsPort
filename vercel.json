@@ -3,5 +3,5 @@
   "outputDirectory": "apps/web/.output",
   "devCommand": "cd apps/web && pnpm dev",
   "installCommand": "pnpm install",
-  "framework": "nuxt"
+  "framework": "nuxtjs"
 }
