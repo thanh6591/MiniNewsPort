@@ -15,24 +15,80 @@ function hoursAgo(hours: number) {
   return new Date(Date.now() - hours * 60 * 60 * 1000);
 }
 
+type CategorySeedConfig = {
+  name: string;
+  slug: string;
+  topics: string[];
+  imageKeyword: string;
+};
+
+const categorySeeds: CategorySeedConfig[] = [
+  {
+    name: "Politics",
+    slug: "politics",
+    topics: ["policy reform", "parliament debate", "election strategy", "public governance", "civic budget"],
+    imageKeyword: "government"
+  },
+  {
+    name: "Business",
+    slug: "business",
+    topics: ["market expansion", "startup funding", "supply chain", "consumer demand", "quarterly growth"],
+    imageKeyword: "finance"
+  },
+  {
+    name: "Technology",
+    slug: "technology",
+    topics: ["ai rollout", "cloud security", "developer platform", "chip innovation", "automation tooling"],
+    imageKeyword: "technology"
+  },
+  {
+    name: "Lifestyle",
+    slug: "lifestyle",
+    topics: ["wellness routine", "home productivity", "travel planning", "food culture", "work-life balance"],
+    imageKeyword: "lifestyle"
+  }
+];
+
+function buildCategoryPost(config: CategorySeedConfig, itemNumber: number, categoryId: number, sequence: number): typeof news.$inferInsert {
+  const topic = config.topics[(itemNumber - 1) % config.topics.length];
+  const title = `${config.name}: ${topic} insight #${itemNumber}`;
+  const summary = `A ${config.name.toLowerCase()} brief on ${topic} with practical context and key takeaways.`;
+  const content = [
+    `${title} focuses on how ${topic} is shaping current ${config.name.toLowerCase()} conversations.`,
+    `The report highlights recent developments, measurable outcomes, and the next likely direction for stakeholders.`,
+    `Readers can use these points to understand momentum, evaluate trade-offs, and track follow-up events in the category.`
+  ].join("\n\n");
+
+  return {
+    title,
+    slug: makeSlug(`${config.slug}-${topic}-${itemNumber}`),
+    summary,
+    content,
+    imageUrl: `https://picsum.photos/seed/${config.imageKeyword}-${itemNumber}/1200/675`,
+    status: "PUBLISHED",
+    publishedAt: hoursAgo(sequence),
+    viewCount: 120 - (itemNumber % 25) + sequence,
+    categoryId,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+}
+
 async function seed() {
-  const categorySeeds = [
-    { name: "Politics", slug: "politics" },
-    { name: "Business", slug: "business" },
-    { name: "Technology", slug: "technology" },
-    { name: "Lifestyle", slug: "lifestyle" }
-  ] as const;
+  // Reset sample content so each run produces a deterministic dataset.
+  await db.delete(newsViewDaily);
+  await db.delete(news);
+  await db.delete(categories);
 
-  const existingCategories = await db.select().from(categories);
-
-  if (existingCategories.length === 0) {
-    const now = new Date();
-    await db.insert(categories).values(categorySeeds.map((item) => ({
-      ...item,
+  const now = new Date();
+  await db.insert(categories).values(
+    categorySeeds.map((item) => ({
+      name: item.name,
+      slug: item.slug,
       createdAt: now,
       updatedAt: now
-    })));
-  }
+    }))
+  );
 
   const allCategories: Array<typeof categories.$inferSelect> = await db
     .select()
@@ -40,7 +96,7 @@ async function seed() {
     .orderBy(categories.id);
   const categoryIdBySlug = new Map<string, number>(allCategories.map((item) => [item.slug, item.id]));
 
-  const publishedPerCategory = 8;
+  const publishedPerCategory = 30;
   let sequence = 0;
   const newsRows: Array<typeof news.$inferInsert> = [];
 
@@ -53,45 +109,11 @@ async function seed() {
 
     for (let i = 1; i <= publishedPerCategory; i += 1) {
       sequence += 1;
-      const title = `${category.name} Update ${i}`;
-      newsRows.push({
-        title,
-        slug: makeSlug(`${category.slug}-update-${i}`),
-        summary: `${category.name} summary ${i}`,
-        content: `${title} detailed content for seeded data.`,
-        imageUrl: `https://picsum.photos/seed/${category.slug}-${i}/1200/675`,
-        status: "PUBLISHED",
-        publishedAt: hoursAgo(sequence),
-        viewCount: 40 + sequence,
-        categoryId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
-    }
-
-    for (let i = 1; i <= 2; i += 1) {
-      const title = `${category.name} Draft ${i}`;
-      newsRows.push({
-        title,
-        slug: makeSlug(`${category.slug}-draft-${i}`),
-        summary: `${category.name} draft summary ${i}`,
-        content: `${title} draft content.`,
-        imageUrl: null,
-        status: "DRAFT",
-        publishedAt: null,
-        viewCount: 0,
-        categoryId,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      });
+      newsRows.push(buildCategoryPost(category, i, categoryId, sequence));
     }
   }
 
-  const existingNews = await db.select().from(news);
-
-  if (existingNews.length === 0) {
-    await db.insert(news).values(newsRows);
-  }
+  await db.insert(news).values(newsRows);
 
   const publishedNews: Array<{ id: number; publishedAt: Date | null }> = await db
     .select({ id: news.id, publishedAt: news.publishedAt })
@@ -102,19 +124,15 @@ async function seed() {
   const today = new Date();
   const todayValue = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
 
-  const existingDailyRows = await db.select().from(newsViewDaily);
+  await db.insert(newsViewDaily).values(
+    publishedNews.slice(0, 24).map((row, index) => ({
+      newsId: row.id,
+      viewDate: todayValue,
+      viewCount: 120 - index * 3
+    }))
+  );
 
-  if (existingDailyRows.length === 0) {
-    await db.insert(newsViewDaily).values(
-      publishedNews.slice(0, 12).map((row, index) => ({
-        newsId: row.id,
-        viewDate: todayValue,
-        viewCount: 10 + (12 - index) * 3
-      }))
-    );
-  }
-
-  console.log(`Seed completed: ${allCategories.length} categories, ${publishedNews.length} published rows.`);
+  console.log(`Seed completed: ${allCategories.length} categories, ${publishedNews.length} published posts (${publishedPerCategory} per category).`);
 }
 
 seed().catch((error) => {
