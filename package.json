@@ -12,7 +12,8 @@
     "test:e2e": "pnpm --dir e2e/playwright test",
     "db:generate": "pnpm --dir apps/web db:generate",
     "db:migrate": "pnpm --dir apps/web db:migrate",
-    "db:seed": "pnpm --dir apps/web db:seed"
+    "db:seed": "pnpm --dir apps/web db:seed",
+    "db:studio": "cd apps/web && pnpm drizzle-kit studio"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",
