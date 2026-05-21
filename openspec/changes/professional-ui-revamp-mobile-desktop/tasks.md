@@ -23,6 +23,7 @@
 - [ ] 4.2 Preserve persistent sidebar behavior for desktop admin viewports
 - [ ] 4.3 Update admin list/form surfaces (categories/news) to remain readable and operable on mobile
 - [ ] 4.4 Verify logout and key admin actions remain accessible in both mobile and desktop navigation states
+- [x] 4.5 Surface admin news validation errors after submit with field-level inline messages and format examples
 
 ## 5. Visual Consistency and Interaction Quality
 

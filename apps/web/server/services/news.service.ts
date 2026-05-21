@@ -12,7 +12,16 @@ function hasOwn(obj: object, key: string) {
 
 function validateRequiredNewsInput(input: Record<string, unknown>, mode: "create" | "update") {
   const requiredFields = ["title", "slug", "summary", "content", "status", "categoryId"] as const;
-  const details: Array<{ field: string; message: string }> = [];
+  const details: Array<{ field: string; message: string; expected?: string; example?: string }> = [];
+
+  const fieldHints: Partial<Record<(typeof requiredFields)[number], { expected: string; example: string }>> = {
+    title: { expected: "non-empty string, max 200 characters", example: "Politics: policy reform insight #1" },
+    slug: { expected: "non-empty string, max 220 characters", example: "politics-policy-reform-1" },
+    summary: { expected: "non-empty string, max 500 characters", example: "Short summary in one sentence." },
+    content: { expected: "non-empty string", example: "Full article content with paragraphs." },
+    status: { expected: '"DRAFT" or "PUBLISHED"', example: "PUBLISHED" },
+    categoryId: { expected: "positive integer", example: "9" }
+  };
 
   for (const field of requiredFields) {
     if (mode === "update" && !hasOwn(input, field)) {
@@ -21,12 +30,22 @@ function validateRequiredNewsInput(input: Record<string, unknown>, mode: "create
 
     const value = input[field];
     if (value === null || value === undefined) {
-      details.push({ field, message: `${field} is required` });
+      const hint = fieldHints[field];
+      details.push({
+        field: `body.${field}`,
+        message: `${field} is required`,
+        ...(hint ? { expected: hint.expected, example: hint.example } : {})
+      });
       continue;
     }
 
     if (typeof value === "string" && value.trim().length === 0) {
-      details.push({ field, message: `${field} is required` });
+      const hint = fieldHints[field];
+      details.push({
+        field: `body.${field}`,
+        message: `${field} is required`,
+        ...(hint ? { expected: hint.expected, example: hint.example } : {})
+      });
     }
   }
 
@@ -38,7 +57,12 @@ function validateRequiredNewsInput(input: Record<string, unknown>, mode: "create
 async function assertCategoryExists(categoryId: unknown) {
   if (typeof categoryId !== "number" || !Number.isInteger(categoryId) || categoryId <= 0) {
     throw new ValidationError("Validation failed", [
-      { field: "categoryId", message: "categoryId must be a positive integer" }
+      {
+        field: "body.categoryId",
+        message: "categoryId must be a positive integer",
+        expected: "positive integer",
+        example: "9"
+      }
     ]);
   }
 
@@ -119,7 +143,14 @@ export const newsService = {
 
     // If publishing, require publishedAt
     if (input.status === "PUBLISHED" && !input.publishedAt) {
-      throw new ValidationError('Published news must have publishedAt set');
+      throw new ValidationError("Validation failed", [
+        {
+          field: "body.publishedAt",
+          message: "publishedAt is required when status is PUBLISHED",
+          expected: "ISO date-time string",
+          example: "2026-05-21T03:00:00.000Z"
+        }
+      ]);
     }
 
     return newsRepo.create(input);
@@ -148,7 +179,14 @@ export const newsService = {
 
     // If changing to published, require publishedAt
     if (input.status === "PUBLISHED" && !input.publishedAt && !article.publishedAt) {
-      throw new ValidationError('Published news must have publishedAt set');
+      throw new ValidationError("Validation failed", [
+        {
+          field: "body.publishedAt",
+          message: "publishedAt is required when status is PUBLISHED",
+          expected: "ISO date-time string",
+          example: "2026-05-21T03:00:00.000Z"
+        }
+      ]);
     }
 
     return newsRepo.update(id, input);
