@@ -114,6 +114,8 @@ export const importService = {
         attempts: item.attempts,
         failureReason: item.failureReason,
         newsId: item.newsId,
+        newsSlug: item.newsSlug ?? null,
+        newsTitle: item.newsTitle ?? null,
         createdAt: item.createdAt,
         updatedAt: item.updatedAt,
         startedAt: item.startedAt,

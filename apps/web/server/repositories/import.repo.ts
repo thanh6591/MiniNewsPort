@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "../db/client";
-import { importBatches, importItems, type importItemStatusEnum } from "../db/schema";
+import { importBatches, importItems, news, type importItemStatusEnum } from "../db/schema";
 
 export type ImportItemStatus = (typeof importItemStatusEnum.enumValues)[number];
 
@@ -44,11 +44,17 @@ export const importRepo = {
   },
 
   async findItemsByBatchId(batchId: number) {
-    return db
-      .select()
+    const rows = await db
+      .select({
+        item: importItems,
+        newsSlug: news.slug,
+        newsTitle: news.title
+      })
       .from(importItems)
+      .leftJoin(news, eq(news.id, importItems.newsId))
       .where(eq(importItems.batchId, batchId))
       .orderBy(importItems.id);
+    return rows.map((r) => ({ ...r.item, newsSlug: r.newsSlug, newsTitle: r.newsTitle }));
   },
 
   async findItemById(itemId: number) {

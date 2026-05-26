@@ -1,4 +1,3 @@
-import { useRuntimeConfig } from "#imports";
 import { getMailer, getAdminEmail } from "../mail/mailer";
 import { importRepo } from "../repositories/import.repo";
 import { getQueueAdapter } from "../queue";

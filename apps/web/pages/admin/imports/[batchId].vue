@@ -40,6 +40,7 @@
             <th class="px-4 py-3">URL</th>
             <th class="px-4 py-3">Status</th>
             <th class="px-4 py-3">Attempts</th>
+            <th class="px-4 py-3">Preview</th>
             <th class="px-4 py-3">Reason</th>
           </tr>
         </thead>
@@ -52,6 +53,18 @@
               <span class="rounded px-2 py-1 text-xs font-medium" :class="statusClass(item.status)">{{ item.status }}</span>
             </td>
             <td class="px-4 py-2 text-slate-700">{{ item.attempts }}</td>
+            <td class="max-w-xs truncate px-4 py-2 text-xs">
+              <NuxtLink
+                v-if="item.status === 'PUBLISHED' && item.newsSlug"
+                :to="`/news/${item.newsSlug}`"
+                target="_blank"
+                class="text-blue-600 hover:underline"
+                :title="item.newsTitle || ''"
+              >
+                {{ item.newsTitle || item.newsSlug }}
+              </NuxtLink>
+              <span v-else class="text-slate-400">—</span>
+            </td>
             <td class="px-4 py-2 text-xs text-red-600">{{ item.failureReason || "" }}</td>
           </tr>
         </tbody>
@@ -74,6 +87,9 @@ type ProgressItem = {
   status: "PENDING" | "PROCESSING" | "PUBLISHED" | "FAILED";
   attempts: number;
   failureReason: string | null;
+  newsId: number | null;
+  newsSlug: string | null;
+  newsTitle: string | null;
 };
 type ProgressResponse = {
   id: number;

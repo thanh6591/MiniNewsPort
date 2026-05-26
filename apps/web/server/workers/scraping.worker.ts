@@ -1,4 +1,3 @@
-import { useRuntimeConfig } from "#imports";
 import { importRepo } from "../repositories/import.repo";
 import { newsRepo } from "../repositories/news.repo";
 import { getQueueAdapter } from "../queue";
@@ -54,12 +53,12 @@ async function uniqueSlug(base: string): Promise<string> {
 }
 
 export async function startScrapingWorker(opts: { concurrency?: number } = {}) {
-  const config = useRuntimeConfig();
-  const maxPerDomain = Math.max(1, Number(config.scrapeMaxPerDomain ?? "2"));
-  const userAgent = String(config.scrapeUserAgent ?? "MiniNewsPortalBot/1.0");
+  const maxPerDomain = Math.max(1, Number(process.env.SCRAPE_MAX_PER_DOMAIN ?? "2"));
+  const userAgent = String(process.env.SCRAPE_USER_AGENT ?? "MiniNewsPortalBot/1.0");
   const concurrency = opts.concurrency ?? Math.max(2, maxPerDomain * 2);
   const semaphore = new DomainSemaphore(maxPerDomain);
   const queue = await getQueueAdapter();
+  console.info(`[scraping-worker] starting (concurrency=${concurrency}, maxPerDomain=${maxPerDomain}, adapter=${queue.kind})`);
 
   return queue.consume<ScrapeJobData>(QUEUE_NAMES.scraping, {
     concurrency,
