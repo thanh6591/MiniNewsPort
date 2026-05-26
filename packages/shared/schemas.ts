@@ -111,6 +111,64 @@ export const apiErrorSchema = z.object({
   })
 });
 
+// ==================== BULK IMPORT ====================
+export const importItemStatusSchema = z.enum(["PENDING", "PROCESSING", "PUBLISHED", "FAILED"]);
+
+export const bulkImportSubmitSchema = z.object({
+  urls: z
+    .string()
+    .min(1, "At least one URL is required")
+    .transform((value) =>
+      value
+        .split(/\r?\n/)
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+    )
+    .pipe(
+      z
+        .array(z.string().url("Each line must be a valid URL"))
+        .min(1, "At least one URL is required")
+        .max(100, "Maximum 100 URLs per submission")
+    ),
+  categoryId: z.number().int().positive("categoryId must be a positive integer")
+});
+
+export const bulkImportSubmitResponseSchema = z.object({
+  batchId: z.number().int().positive(),
+  acceptedCount: z.number().int().nonnegative(),
+  skippedCount: z.number().int().nonnegative()
+});
+
+export const importItemSchema = z.object({
+  id: z.number(),
+  batchId: z.number(),
+  sourceUrl: z.string(),
+  status: importItemStatusSchema,
+  attempts: z.number(),
+  failureReason: z.string().nullable(),
+  newsId: z.number().nullable(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()]),
+  startedAt: z.union([z.string(), z.date()]).nullable(),
+  completedAt: z.union([z.string(), z.date()]).nullable()
+});
+
+export const importBatchSchema = z.object({
+  id: z.number(),
+  categoryId: z.number(),
+  totalCount: z.number(),
+  pendingCount: z.number(),
+  processingCount: z.number(),
+  publishedCount: z.number(),
+  failedCount: z.number(),
+  createdAt: z.union([z.string(), z.date()]),
+  updatedAt: z.union([z.string(), z.date()])
+});
+
+export const importBatchProgressSchema = importBatchSchema.extend({
+  items: z.array(importItemSchema)
+});
+
 // ==================== TYPE EXPORTS ====================
 export type CategoryCreate = z.infer<typeof categoryCreateSchema>;
 export type CategoryUpdate = z.infer<typeof categoryUpdateSchema>;
@@ -137,3 +195,11 @@ export type JWTPayload = z.infer<typeof jwtPayloadSchema>;
 export type AuthMe = z.infer<typeof authMeSchema>;
 
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export type ImportItemStatus = z.infer<typeof importItemStatusSchema>;
+export type BulkImportSubmit = z.input<typeof bulkImportSubmitSchema>;
+export type BulkImportSubmitParsed = z.infer<typeof bulkImportSubmitSchema>;
+export type BulkImportSubmitResponse = z.infer<typeof bulkImportSubmitResponseSchema>;
+export type ImportItem = z.infer<typeof importItemSchema>;
+export type ImportBatch = z.infer<typeof importBatchSchema>;
+export type ImportBatchProgress = z.infer<typeof importBatchProgressSchema>;

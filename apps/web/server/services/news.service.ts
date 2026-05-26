@@ -1,7 +1,4 @@
-import { eq, and } from "drizzle-orm";
-import { db } from "../db/client";
-import { news } from "../db/schema";
-import { newsRepo, type NewsListFilters, type NewsCreateInput, type NewsUpdateInput } from "../repositories/news.repo";
+import { newsRepo, type NewsCreateInput, type NewsUpdateInput } from "../repositories/news.repo";
 import { viewRepo } from "../repositories/view.repo";
 import { categoryService } from "./category.service";
 import { NotFoundError, ConflictError, ValidationError, CategoryNotFoundError } from "./errors";
@@ -90,20 +87,6 @@ export const newsService = {
       throw new NotFoundError("Article", slug);
     }
 
-    // Atomic increment view count and upsert daily view in a transaction
-    const today = new Date();
-    const todayValue = `${today.getUTCFullYear()}-${String(today.getUTCMonth() + 1).padStart(2, "0")}-${String(today.getUTCDate()).padStart(2, "0")}`;
-
-    await db.transaction(async (tx) => {
-      await tx
-        .update(news)
-        .set({ viewCount: (article.viewCount ?? 0) + 1, updatedAt: new Date() })
-        .where(eq(news.id, article.id));
-
-      await viewRepo.upsertAndIncrementToday(article.id, todayValue);
-    });
-
-    // Fetch updated article and siblings
     const [newer, older] = await Promise.all([
       newsRepo.findNewerSibling({ id: article.id, publishedAt: article.publishedAt }),
       newsRepo.findOlderSibling({ id: article.id, publishedAt: article.publishedAt })
@@ -111,7 +94,6 @@ export const newsService = {
 
     return {
       ...article,
-      viewCount: (article.viewCount ?? 0) + 1,
       newerSlug: newer?.slug ?? null,
       olderSlug: older?.slug ?? null
     };

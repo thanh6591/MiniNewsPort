@@ -17,6 +17,15 @@ export default defineNuxtConfig({
     jwtSecret: process.env.JWT_SECRET || "dev-secret-key-32-characters-minimum-required",
     adminUsername: process.env.ADMIN_USERNAME || "admin",
     adminPassword: process.env.ADMIN_PASSWORD || "admin123",
+    redisUrl: process.env.REDIS_URL || "",
+    workersInProcess: process.env.WORKERS_INPROCESS || "",
+    scrapeMaxPerDomain: process.env.SCRAPE_MAX_PER_DOMAIN || "2",
+    scrapeUserAgent: process.env.SCRAPE_USER_AGENT || "MiniNewsPortalBot/1.0",
+    smtpHost: process.env.SMTP_HOST || "",
+    smtpPort: process.env.SMTP_PORT || "587",
+    smtpUser: process.env.SMTP_USER || "",
+    smtpPass: process.env.SMTP_PASS || "",
+    adminEmail: process.env.ADMIN_EMAIL || "",
     public: {
       apiBase: process.env.NUXT_PUBLIC_API_BASE || "/api"
     }

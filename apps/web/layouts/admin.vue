@@ -36,6 +36,7 @@
           <NuxtLink to="/admin" class="block rounded px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900" @click="isNavOpen = false">Dashboard</NuxtLink>
           <NuxtLink to="/admin/categories" class="block rounded px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900" @click="isNavOpen = false">Categories</NuxtLink>
           <NuxtLink to="/admin/news" class="block rounded px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900" @click="isNavOpen = false">News</NuxtLink>
+          <NuxtLink to="/admin/imports" class="block rounded px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900" @click="isNavOpen = false">Imports</NuxtLink>
         </nav>
         <button @click="logout" class="mt-8 w-full rounded bg-red-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-red-700">Logout</button>
       </aside>

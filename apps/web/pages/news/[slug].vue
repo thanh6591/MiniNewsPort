@@ -11,4 +11,10 @@ const route = useRoute();
 const slug = route.params.slug as string;
 
 const { data: article } = await useFetch<NewsDetail>(`/api/news/${slug}`);
+
+onMounted(() => {
+  const id = article.value?.id;
+  if (!id) return;
+  $fetch(`/api/news/${id}/view`, { method: "POST" }).catch(() => {});
+});
 </script>

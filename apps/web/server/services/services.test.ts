@@ -197,9 +197,8 @@ describe("Services", () => {
       ).rejects.toThrow(CategoryNotFoundError);
     });
 
-    it("should return article with incremented view count and sibling slugs", async () => {
+    it("should return article unchanged (view increment is now async) with sibling slugs", async () => {
       const { newsRepo: newsRepoMock } = await import("../repositories/news.repo");
-      const { viewRepo } = await import("../repositories/view.repo");
 
       const mockArticle = {
         id: 1,
@@ -223,16 +222,10 @@ describe("Services", () => {
       vi.mocked(newsRepoMock.findBySlug).mockResolvedValueOnce(mockArticle);
       vi.mocked(newsRepoMock.findNewerSibling).mockResolvedValueOnce(mockNewer);
       vi.mocked(newsRepoMock.findOlderSibling).mockResolvedValueOnce(mockOlder);
-      vi.mocked(viewRepo.upsertAndIncrementToday).mockResolvedValueOnce({
-        id: 1,
-        newsId: 1,
-        viewDate: "2026-05-16",
-        viewCount: 1
-      });
 
       const result = await newsService.getDetailBySlug("test");
 
-      expect(result.viewCount).toBe(6); // incremented from 5
+      expect(result.viewCount).toBe(5); // no longer incremented in getDetailBySlug
       expect(result.newerSlug).toBe("newer-article");
       expect(result.olderSlug).toBe("older-article");
     });
