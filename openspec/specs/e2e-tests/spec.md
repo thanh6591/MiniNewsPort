@@ -4,11 +4,15 @@
 TBD - created by archiving change mini-news-portal. Update Purpose after archive.
 ## Requirements
 ### Requirement: Playwright project covers public site flows
-The system SHALL include a Playwright test suite verifying the public site happy paths.
+The system SHALL include a Playwright test suite verifying public site happy paths at representative mobile and desktop viewports.
 
-#### Scenario: Home page renders sections and most-viewed widget
-- **WHEN** the test opens `/`
-- **THEN** at least one category section and the "Most Viewed Today" widget are visible
+#### Scenario: Home page renders sections and most-viewed widget on mobile
+- **WHEN** the test opens `/` using a mobile viewport profile
+- **THEN** at least one category section and the "Most Viewed Today" widget are visible with no horizontal page overflow
+
+#### Scenario: Home page renders sections and most-viewed widget on desktop
+- **WHEN** the test opens `/` using a desktop viewport profile
+- **THEN** at least one category section and the "Most Viewed Today" widget are visible with multi-column layout behavior
 
 #### Scenario: Category page infinite scroll loads more items
 - **WHEN** the test scrolls to the bottom of a seeded category page with > 10 items
@@ -19,7 +23,7 @@ The system SHALL include a Playwright test suite verifying the public site happy
 - **THEN** the displayed view count increases by 1 between visits, and clicking "Newer Post" or "Older Post" navigates to the expected sibling
 
 ### Requirement: Playwright project covers back-office flows
-The system SHALL include a Playwright test suite verifying back-office authentication and CRUD.
+The system SHALL include a Playwright test suite verifying back-office authentication, CRUD, and responsive shell behavior.
 
 #### Scenario: Invalid login shows error
 - **WHEN** the test submits wrong credentials on `/admin/login`
@@ -40,6 +44,10 @@ The system SHALL include a Playwright test suite verifying back-office authentic
 #### Scenario: Logout invalidates access
 - **WHEN** the test clicks Logout and then navigates to `/admin/news`
 - **THEN** it is redirected to `/admin/login`
+
+#### Scenario: Admin navigation works on mobile viewport
+- **WHEN** the test opens `/admin` on a mobile viewport and toggles navigation
+- **THEN** admin navigation actions are accessible and the drawer can be closed without breaking page interaction
 
 ### Requirement: Test environment isolation
 The test suite SHALL run against a dedicated test database that is reset to a known seed before the run.

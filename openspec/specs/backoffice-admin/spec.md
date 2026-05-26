@@ -37,7 +37,7 @@ The system SHALL block unauthenticated access to all `/admin/**` pages except `/
 - **THEN** the next admin action redirects to `/admin/login` with a "Session expired" notice
 
 ### Requirement: Category CRUD UI
-The system SHALL provide an admin UI to list, create, edit, and delete categories.
+The system SHALL provide a responsive admin UI to list, create, edit, and delete categories.
 
 #### Scenario: List categories
 - **WHEN** the admin opens `/admin/categories`
@@ -63,8 +63,12 @@ The system SHALL provide an admin UI to list, create, edit, and delete categorie
 - **WHEN** the admin submits an invalid name or slug
 - **THEN** field-level error messages are shown and the request is not sent again until corrected
 
+#### Scenario: Category UI remains usable on mobile
+- **WHEN** the admin manages categories on a mobile viewport
+- **THEN** list and form interactions remain operable with readable density, no clipped controls, and tappable action targets
+
 ### Requirement: News CRUD UI
-The system SHALL provide an admin UI to list, create, edit, and delete news articles.
+The system SHALL provide a responsive admin UI to list, create, edit, and delete news articles.
 
 #### Scenario: List news with filters
 - **WHEN** the admin opens `/admin/news`
@@ -85,4 +89,19 @@ The system SHALL provide an admin UI to list, create, edit, and delete news arti
 #### Scenario: Validation errors are surfaced
 - **WHEN** the API returns a 400 validation error
 - **THEN** each field error is mapped to the corresponding form field
+
+#### Scenario: News UI remains usable on mobile
+- **WHEN** the admin manages news on a mobile viewport
+- **THEN** filters, row actions, and form controls are reachable and usable without horizontal scrolling of the whole page
+
+### Requirement: Admin shell provides mobile-first navigation
+The system SHALL provide a responsive admin shell where navigation is available via drawer/toggle on small screens and persistent sidebar on large screens.
+
+#### Scenario: Mobile admin navigation opens and closes
+- **WHEN** an authenticated admin opens any `/admin/**` page on a mobile viewport and taps the menu toggle
+- **THEN** the navigation drawer opens with dashboard, categories, news, and logout actions, and closes via explicit close action or backdrop interaction
+
+#### Scenario: Desktop admin navigation is persistently visible
+- **WHEN** an authenticated admin opens any `/admin/**` page on desktop viewport
+- **THEN** the navigation sidebar is visible without requiring a toggle and content remains readable beside the sidebar
 

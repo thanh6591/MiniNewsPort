@@ -71,7 +71,7 @@ The API SHALL expose `POST /api/auth/login` and `POST /api/auth/logout` for stat
 - **THEN** the response is 204 and the `mnp_token` cookie is cleared
 
 ### Requirement: Admin category CRUD endpoints
-The API SHALL expose authenticated `GET/POST/PUT/DELETE /api/admin/categories` operations, requiring a valid JWT.
+The API SHALL expose authenticated `GET/POST/PUT/DELETE /api/admin/categories` operations, requiring a valid JWT, and SHALL enforce FK-related delete restrictions.
 
 #### Scenario: Create category
 - **WHEN** an authenticated admin posts a valid category body
@@ -98,7 +98,7 @@ The API SHALL expose authenticated `GET/POST/PUT/DELETE /api/admin/categories` o
 - **THEN** the response is 401 with `error.code = "UNAUTHORIZED"`
 
 ### Requirement: Admin news CRUD endpoints
-The API SHALL expose authenticated `GET/POST/PUT/DELETE /api/admin/news` operations with validation per the news rules.
+The API SHALL expose authenticated `GET/POST/PUT/DELETE /api/admin/news` operations with validation and integrity-constraint behavior for required fields and category references.
 
 #### Scenario: Create news
 - **WHEN** an authenticated admin posts a valid news body
@@ -107,6 +107,10 @@ The API SHALL expose authenticated `GET/POST/PUT/DELETE /api/admin/news` operati
 #### Scenario: Validation failure on create/edit
 - **WHEN** the body fails any field rule (title, slug pattern, summary length, content length, imageUrl URL, categoryId existence, status enum, publishedAt when PUBLISHED)
 - **THEN** the response is 400 with `error.code = "VALIDATION_ERROR"` and a `details` array listing each invalid field
+
+#### Scenario: Missing required field
+- **WHEN** required fields (`title`, `slug`, `summary`, `content`, `status`, or `categoryId`) are missing or null in create/update payloads
+- **THEN** the response is 400 with `error.code = "VALIDATION_ERROR"`
 
 #### Scenario: Reference to missing category
 - **WHEN** the `categoryId` does not exist

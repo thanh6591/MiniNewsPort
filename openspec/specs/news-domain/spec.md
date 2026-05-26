@@ -4,7 +4,7 @@
 TBD - created by archiving change mini-news-portal. Update Purpose after archive.
 ## Requirements
 ### Requirement: Category entity and schema
-The persistence layer SHALL define a `Category` table with the columns and constraints below.
+The persistence layer SHALL define a `Category` table with explicit required-field and uniqueness constraints.
 
 Columns:
 - `id` PK, auto-generated.
@@ -49,9 +49,13 @@ Indexes:
 - **WHEN** a row with all required fields and a valid `category_id` is inserted
 - **THEN** the insert succeeds
 
+#### Scenario: Missing required field rejected
+- **WHEN** any required column (`title`, `slug`, `summary`, `content`, `status`, `category_id`) is null
+- **THEN** the database rejects the insert or update with a not-null violation
+
 #### Scenario: Missing category FK rejected
 - **WHEN** `category_id` references a non-existent Category
-- **THEN** the database rejects the insert with an FK violation
+- **THEN** the database rejects the insert or update with an FK violation
 
 #### Scenario: Delete category referenced by news rejected
 - **WHEN** an attempt is made to delete a Category referenced by at least one News
@@ -62,7 +66,7 @@ Indexes:
 - **THEN** the database rejects the insert via the CHECK constraint
 
 ### Requirement: Daily view counter entity
-The persistence layer SHALL define a `NewsViewDaily` table with unique `(news_id, view_date)` to support efficient "Most Viewed Today" queries.
+The persistence layer SHALL define a `NewsViewDaily` table with unique `(news_id, view_date)` and a required FK to `News(id)`.
 
 Columns:
 - `id` PK.
@@ -79,6 +83,10 @@ Columns:
 #### Scenario: Increment existing counter
 - **WHEN** a view event occurs and `(news_id, today)` already exists
 - **THEN** `view_count` is incremented by 1 atomically
+
+#### Scenario: Missing news FK rejected
+- **WHEN** `news_id` references a non-existent News row
+- **THEN** the database rejects the insert with an FK violation
 
 #### Scenario: Cascade on news delete
 - **WHEN** a News row is deleted
