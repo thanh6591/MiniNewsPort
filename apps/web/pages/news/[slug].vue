@@ -15,6 +15,12 @@ const { data: article } = await useFetch<NewsDetail>(`/api/news/${slug}`);
 onMounted(() => {
   const id = article.value?.id;
   if (!id) return;
-  $fetch(`/api/news/${id}/view`, { method: "POST" }).catch(() => {});
+  $fetch(`/api/news/${id}/view`, { method: "POST" })
+    .then(() => {
+      if (article.value) {
+        article.value.viewCount += 1;
+      }
+    })
+    .catch(() => {});
 });
 </script>

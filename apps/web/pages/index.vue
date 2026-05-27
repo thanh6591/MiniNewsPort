@@ -20,6 +20,7 @@ type MostViewedItem = {
   summary: string;
   imageUrl: string | null;
   viewCount: number;
+  totalViewCount: number;
   publishedAt: string | Date | null;
 };
 

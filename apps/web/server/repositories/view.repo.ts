@@ -28,6 +28,7 @@ export const viewRepo = {
         newsId: newsViewDaily.newsId,
         viewDate: newsViewDaily.viewDate,
         viewCount: newsViewDaily.viewCount,
+        totalViewCount: news.viewCount,
         slug: news.slug,
         title: news.title,
         summary: news.summary,

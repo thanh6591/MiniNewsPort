@@ -22,7 +22,9 @@
         <div class="space-y-2 md:col-span-5">
           <h3 class="line-clamp-3 text-2xl font-semibold leading-tight text-slate-900">{{ featured.title }}</h3>
           <p class="line-clamp-4 text-base leading-relaxed text-slate-700">{{ featured.summary }}</p>
-          <p class="text-sm text-slate-500">{{ formatPublishedAt(featured.publishedAt) }} • {{ featured.viewCount }} views</p>
+          <p class="text-sm text-slate-500">
+            {{ formatPublishedAt(featured.publishedAt) }} • {{ featured.viewCount }} views today • {{ featured.totalViewCount }} total views
+          </p>
         </div>
       </NuxtLink>
 
@@ -44,7 +46,7 @@
           </div>
           <h4 class="line-clamp-3 text-xl font-semibold leading-tight text-slate-900">{{ item.title }}</h4>
           <p class="line-clamp-3 text-base text-slate-700">{{ item.summary }}</p>
-          <p class="text-sm text-slate-500">{{ item.viewCount }} views</p>
+          <p class="text-sm text-slate-500">{{ item.viewCount }} today • {{ item.totalViewCount }} total</p>
         </NuxtLink>
       </div>
 
@@ -72,6 +74,7 @@ type MostViewedItem = {
   summary: string;
   imageUrl: string | null;
   viewCount: number;
+  totalViewCount: number;
   publishedAt: string | Date | null;
 };
 
