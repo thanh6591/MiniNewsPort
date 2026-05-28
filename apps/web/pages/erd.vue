@@ -5,7 +5,7 @@
       <p class="text-sm text-slate-600 sm:text-base">Open each diagram to understand how the system works by layer, security flow, and API validation.</p>
     </header>
 
-    <div class="grid gap-4 md:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       <NuxtLink to="/diagrams/layered-architecture" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
         <h2 class="text-lg font-semibold text-slate-900">Layered Architecture</h2>
         <p class="mt-2 text-sm text-slate-600">Transport, Service, and Persistence responsibilities in one diagram.</p>
@@ -19,6 +19,11 @@
       <NuxtLink to="/diagrams/error-validation" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
         <h2 class="text-lg font-semibold text-slate-900">Error & Validation</h2>
         <p class="mt-2 text-sm text-slate-600">Input validation and specific HTTP status behavior for create/edit news.</p>
+      </NuxtLink>
+
+      <NuxtLink to="/diagrams/bulk-import-messaging" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
+        <h2 class="text-lg font-semibold text-slate-900">Bulk Import & Messaging</h2>
+        <p class="mt-2 text-sm text-slate-600">Detailed queue flow for retries, DLQ routing, and email alert handling.</p>
       </NuxtLink>
     </div>
     
