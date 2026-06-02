@@ -29,12 +29,16 @@ const { data: mostViewed } = await useFetch<MostViewedItem[]>("/api/news/most-vi
 
 const categoriesNews = ref<Record<number, News[]>>({});
 
-onMounted(async () => {
-  for (const cat of categories.value ?? []) {
-    const { data } = await useFetch<{ items: News[] }>(`/api/news?categoryId=${cat.id}&limit=5`);
-    if (data.value?.items) {
-      categoriesNews.value[cat.id] = data.value.items;
+for (const cat of categories.value ?? []) {
+  const { data } = await useFetch<{ items: News[] }>(`/api/news`, {
+    query: {
+      categoryId: cat.id,
+      limit: 5
     }
+  });
+
+  if (data.value?.items) {
+    categoriesNews.value[cat.id] = data.value.items;
   }
-});
+}
 </script>

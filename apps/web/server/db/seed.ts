@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "./client";
-import { categories, news, newsViewDaily } from "./schema";
+import { categories, importBatches, importItems, news, newsViewDaily } from "./schema";
 
 function makeSlug(input: string) {
   return input
@@ -80,6 +80,8 @@ function buildCategoryPost(config: CategorySeedConfig, itemNumber: number, categ
 
 async function seed() {
   // Reset sample content so each run produces a deterministic dataset.
+  await db.delete(importItems);
+  await db.delete(importBatches);
   await db.delete(newsViewDaily);
   await db.delete(news);
   await db.delete(categories);

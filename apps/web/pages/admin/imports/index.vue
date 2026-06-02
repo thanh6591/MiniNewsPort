@@ -74,14 +74,29 @@ const lineCount = computed(() =>
     .filter((l) => l.length > 0).length
 );
 
+const validCategoryIds = computed(() => new Set(categoriesStore.categories.map((cat) => cat.id)));
+
 onMounted(async () => {
+  await categoriesStore.fetchCategories();
+
   if (categoriesStore.categories.length === 0) {
-    await categoriesStore.fetchCategories();
+    categoryId.value = null;
+    return;
+  }
+
+  if (categoryId.value == null || !validCategoryIds.value.has(categoryId.value)) {
+    categoryId.value = categoriesStore.categories[0]?.id ?? null;
   }
 });
 
 async function onSubmit() {
   errorMessage.value = null;
+
+  if (categoryId.value == null || !validCategoryIds.value.has(categoryId.value)) {
+    errorMessage.value = "Please select a valid category";
+    return;
+  }
+
   submitting.value = true;
   try {
     const response = await $fetch<{ batchId: number; acceptedCount: number; skippedCount: number }>(
