@@ -1,4 +1,6 @@
 import { defineNuxtConfig } from "nuxt/config";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export default defineNuxtConfig({
   compatibilityDate: "2025-07-15",
@@ -39,5 +41,11 @@ export default defineNuxtConfig({
   },
   devServer: {
     port: 3010
+  },
+  vite: {
+    cacheDir: join(tmpdir(), "mini-news-portal-vite-cache"),
+    optimizeDeps: {
+      include: ["mermaid"]
+    }
   }
 });

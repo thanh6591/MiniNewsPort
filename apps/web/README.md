@@ -10,6 +10,7 @@ A modern, full-stack news portal built with Nuxt 3, Vue 3, Pinia, Drizzle ORM, a
 - Most viewed articles daily ranking
 - Infinite scroll pagination
 - Responsive design with Tailwind CSS
+- Architecture diagrams at `/erd`, including Bulk Import and Messaging with a beginner-focused "Backend Deep Dive" tab
 
 ### Admin Panel (`/admin`)
 - Secure JWT-based authentication

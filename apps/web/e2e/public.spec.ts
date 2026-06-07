@@ -81,4 +81,41 @@ test.describe("Public News Site", () => {
 
     await expect(page.locator("footer")).toBeVisible();
   });
+
+  test("should show backend deep-dive tab for bulk import diagram", async ({ page }) => {
+    await page.goto("/diagrams/bulk-import-messaging");
+
+    await expect(page.getByTestId("bulk-import-tab-diagram")).toBeVisible();
+    await expect(page.getByTestId("bulk-import-tab-deep-dive")).toBeVisible();
+
+    await page.getByTestId("bulk-import-tab-deep-dive").click();
+
+    await expect(page.getByTestId("deep-dive-title")).toBeVisible();
+    await expect(page.getByTestId("stage-section-intake")).toBeVisible();
+    await expect(page.getByTestId("stage-section-enqueue")).toBeVisible();
+    await expect(page.getByTestId("stage-section-processing")).toBeVisible();
+    await expect(page.getByTestId("stage-section-retry-dlq")).toBeVisible();
+    await expect(page.getByTestId("stage-section-polling")).toBeVisible();
+    await expect(page.getByTestId("stage-section-email-notification")).toBeVisible();
+  });
+
+  test("should render code references and storage details for each deep-dive stage", async ({ page }) => {
+    await page.goto("/diagrams/bulk-import-messaging");
+    await page.getByTestId("bulk-import-tab-deep-dive").click();
+
+    const stageIds = [
+      "intake",
+      "validation",
+      "enqueue",
+      "processing",
+      "retry-dlq",
+      "polling",
+      "email-notification"
+    ];
+
+    for (const stageId of stageIds) {
+      await expect(page.locator(`[data-testid^=\"stage-code-ref-${stageId}-\"]`).first()).toBeVisible();
+      await expect(page.locator(`[data-testid^=\"stage-storage-${stageId}-\"]`).first()).toBeVisible();
+    }
+  });
 });

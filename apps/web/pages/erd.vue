@@ -23,7 +23,7 @@
 
       <NuxtLink to="/diagrams/bulk-import-messaging" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
         <h2 class="text-lg font-semibold text-slate-900">Bulk Import & Messaging</h2>
-        <p class="mt-2 text-sm text-slate-600">Detailed queue flow for retries, DLQ routing, and email alert handling.</p>
+        <p class="mt-2 text-sm text-slate-600">Detailed queue flow with a beginner-friendly backend deep-dive tab for code-level learning.</p>
       </NuxtLink>
     </div>
     
