@@ -196,3 +196,12 @@ bun run preview
 ```
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.
+
+
+Link Mailpit UI:
+http://localhost:8025
+
+SMTP của service này:
+
+Host: localhost
+Port: 1025

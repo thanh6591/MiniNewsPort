@@ -10,6 +10,8 @@
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r --if-present run test",
     "test:e2e": "pnpm --dir e2e/playwright test",
+    "mail:up": "docker compose up -d mailpit",
+    "mail:down": "docker compose stop mailpit",
     "db:generate": "pnpm --dir apps/web db:generate",
     "db:migrate": "pnpm --dir apps/web db:migrate",
     "db:seed": "pnpm --dir apps/web db:seed",
