@@ -55,13 +55,13 @@ export const BULK_IMPORT_DEEP_DIVE_STAGES: DeepDiveStage[] = [
         explanation: "Entry handler that runs requireAdmin, validate, and importService.submitBulk in order."
       },
       {
-        filePath: "apps/web/server/middleware/admin-auth.ts",
+        filePath: "apps/web/server/utils/auth.ts",
         functionName: "requireAdmin",
         explanation: "Guards the endpoint so only authenticated admins can submit bulk imports."
       },
       {
         filePath: "apps/web/server/services/import.service.ts",
-        functionName: "importService.submitBulk",
+        functionName: "submitBulk",
         explanation: "Starts core orchestration and returns the response payload for 202 acknowledgement."
       }
     ],
@@ -89,7 +89,7 @@ export const BULK_IMPORT_DEEP_DIVE_STAGES: DeepDiveStage[] = [
     functionWalkthrough: [
       {
         filePath: "apps/web/server/services/import.service.ts",
-        functionName: "importService.submitBulk",
+        functionName: "submitBulk",
         explanation: "Performs length checks, category lookup, URL normalization, and dedupe logic."
       },
       {
@@ -127,12 +127,12 @@ export const BULK_IMPORT_DEEP_DIVE_STAGES: DeepDiveStage[] = [
     functionWalkthrough: [
       {
         filePath: "apps/web/server/repositories/import.repo.ts",
-        functionName: "importRepo.createBatch",
+        functionName: "createBatch",
         explanation: "Atomic transaction that creates parent batch and child import items."
       },
       {
         filePath: "apps/web/server/services/import.service.ts",
-        functionName: "getQueueAdapter / queue.publish",
+        functionName: "getQueueAdapter",
         explanation: "Publishes each persisted item into news-scraping-queue asynchronously."
       },
       {
@@ -170,7 +170,7 @@ export const BULK_IMPORT_DEEP_DIVE_STAGES: DeepDiveStage[] = [
       },
       {
         filePath: "apps/web/server/repositories/import.repo.ts",
-        functionName: "markItemProcessing / markItemPublished",
+        functionName: "markItemProcessing",
         explanation: "Tracks runtime transitions and links import item to created news row."
       },
       {
@@ -213,7 +213,7 @@ export const BULK_IMPORT_DEEP_DIVE_STAGES: DeepDiveStage[] = [
       },
       {
         filePath: "apps/web/server/workers/errors.ts",
-        functionName: "HttpFetchError / SelectorMismatchError",
+        functionName: "HttpFetchError",
         explanation: "Encodes retryable vs non-retryable error semantics consumed by adapter logic."
       }
     ],
@@ -251,7 +251,7 @@ export const BULK_IMPORT_DEEP_DIVE_STAGES: DeepDiveStage[] = [
       },
       {
         filePath: "apps/web/server/repositories/import.repo.ts",
-        functionName: "findItemsByBatchId / statusCounts",
+        functionName: "findItemsByBatchId",
         explanation: "Provides joined rows and grouped status numbers used by dashboard polling."
       }
     ],
@@ -284,7 +284,7 @@ export const BULK_IMPORT_DEEP_DIVE_STAGES: DeepDiveStage[] = [
       },
       {
         filePath: "apps/web/server/mail/mailer.ts",
-        functionName: "getMailer / getAdminEmail",
+        functionName: "getMailer",
         explanation: "Chooses SMTP or noop transport and resolves target admin mailbox."
       },
       {

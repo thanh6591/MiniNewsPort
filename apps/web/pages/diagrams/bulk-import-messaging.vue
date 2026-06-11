@@ -98,9 +98,41 @@
                   class="rounded border border-slate-200 bg-white p-2"
                   :data-testid="`stage-code-ref-${stage.id}-${referenceIndex}`"
                 >
-                  <p class="font-medium text-slate-900 break-all">{{ refItem.filePath }}</p>
-                  <p class="text-slate-800">Function: {{ refItem.functionName }}</p>
-                  <p class="text-slate-600">{{ refItem.explanation }}</p>
+                  <button
+                    type="button"
+                    class="w-full text-left"
+                    :aria-expanded="isReferenceExpanded(stage.id, referenceIndex)"
+                    @click="toggleReferenceCode(stage.id, referenceIndex, refItem)"
+                  >
+                    <p class="font-medium text-slate-900 break-all">{{ refItem.filePath }}</p>
+                    <p class="text-slate-800">Function: {{ refItem.functionName }}</p>
+                    <p class="text-slate-600">{{ refItem.explanation }}</p>
+                    <p class="mt-1 text-xs font-medium text-blue-700">
+                      {{ isReferenceExpanded(stage.id, referenceIndex) ? "Hide code snippet" : "Click to view code snippet" }}
+                    </p>
+                  </button>
+
+                  <div v-if="isReferenceExpanded(stage.id, referenceIndex)" class="mt-2 rounded-md border border-slate-200 bg-slate-950/95 p-3">
+                    <p
+                      v-if="getReferenceSnippetState(stage.id, referenceIndex)?.loading"
+                      class="text-xs text-slate-200"
+                    >
+                      Loading code snippet...
+                    </p>
+                    <p
+                      v-else-if="getReferenceSnippetState(stage.id, referenceIndex)?.error"
+                      class="text-xs text-red-300"
+                    >
+                      {{ getReferenceSnippetState(stage.id, referenceIndex)?.error }}
+                    </p>
+                    <template v-else-if="getReferenceSnippetState(stage.id, referenceIndex)?.data">
+                      <p class="mb-2 text-[11px] text-slate-300">
+                        {{ getReferenceSnippetState(stage.id, referenceIndex)?.data?.filePath }}
+                        (lines {{ getReferenceSnippetState(stage.id, referenceIndex)?.data?.startLine }}-{{ getReferenceSnippetState(stage.id, referenceIndex)?.data?.endLine }})
+                      </p>
+                      <pre class="overflow-x-auto text-xs leading-5 text-slate-100"><code>{{ getReferenceSnippetState(stage.id, referenceIndex)?.data?.snippet }}</code></pre>
+                    </template>
+                  </div>
                 </li>
               </ul>
             </section>
@@ -141,12 +173,110 @@ import {
   BULK_IMPORT_DEEP_DIVE_STAGES,
   BULK_IMPORT_TABS,
   resolveBulkImportTab,
+  type DeepDiveCodeReference,
+  type DeepDiveStageId,
   type DiagramTabId
 } from "./bulk-import-messaging.deep-dive";
 
 const diagramContainer = ref<HTMLElement | null>(null);
 const renderError = ref("");
 const activeTab = ref<DiagramTabId>(resolveBulkImportTab("diagram"));
+const expandedReferenceKey = ref<string | null>(null);
+
+type FunctionSnippetResponse = {
+  filePath: string;
+  functionName: string;
+  startLine: number;
+  endLine: number;
+  snippet: string;
+};
+
+type SnippetState = {
+  loading: boolean;
+  error: string;
+  data: FunctionSnippetResponse | null;
+};
+
+const referenceSnippetState = ref<Record<string, SnippetState>>({});
+
+function getReferenceKey(stageId: DeepDiveStageId, referenceIndex: number): string {
+  return `${stageId}:${referenceIndex}`;
+}
+
+function isReferenceExpanded(stageId: DeepDiveStageId, referenceIndex: number): boolean {
+  return expandedReferenceKey.value === getReferenceKey(stageId, referenceIndex);
+}
+
+function getReferenceSnippetState(stageId: DeepDiveStageId, referenceIndex: number): SnippetState | undefined {
+  return referenceSnippetState.value[getReferenceKey(stageId, referenceIndex)];
+}
+
+function resolveSnippetError(error: unknown): string {
+  if (typeof error === "object" && error && "data" in error) {
+    const payload = (error as { data?: { message?: string } }).data;
+    if (payload?.message) {
+      return payload.message;
+    }
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return "Unable to load code snippet right now.";
+}
+
+async function toggleReferenceCode(stageId: DeepDiveStageId, referenceIndex: number, refItem: DeepDiveCodeReference): Promise<void> {
+  const key = getReferenceKey(stageId, referenceIndex);
+  if (expandedReferenceKey.value === key) {
+    expandedReferenceKey.value = null;
+    return;
+  }
+
+  expandedReferenceKey.value = key;
+  const existingState = referenceSnippetState.value[key];
+  if (existingState?.loading || existingState?.data) {
+    return;
+  }
+
+  referenceSnippetState.value[key] = {
+    loading: true,
+    error: "",
+    data: null
+  };
+
+  try {
+    const query = new URLSearchParams({
+      filePath: refItem.filePath,
+      functionName: refItem.functionName
+    });
+    const response = await fetch(`/api/diagrams/function-snippet?${query.toString()}`);
+    if (!response.ok) {
+      let errorMessage = "Unable to load code snippet.";
+      try {
+        const errorPayload = (await response.json()) as {
+          data?: { message?: string };
+          message?: string;
+          statusMessage?: string;
+        };
+        errorMessage = errorPayload?.data?.message ?? errorPayload?.message ?? errorPayload?.statusMessage ?? errorMessage;
+      } catch {
+        // Keep fallback message.
+      }
+      throw new Error(errorMessage);
+    }
+    const snippet = (await response.json()) as FunctionSnippetResponse;
+    referenceSnippetState.value[key] = {
+      loading: false,
+      error: "",
+      data: snippet
+    };
+  } catch (error) {
+    referenceSnippetState.value[key] = {
+      loading: false,
+      error: resolveSnippetError(error),
+      data: null
+    };
+  }
+}
 
 const definition = `
 flowchart TB
