@@ -1,4 +1,4 @@
-import { and, asc, count, desc, eq, lt, gt, or, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, lt, gt, or, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { categories, news, type newsStatusEnum } from "../db/schema";
 
@@ -105,6 +105,90 @@ export const newsRepo = {
   async findById(id: number) {
     const rows = await db.select().from(news).where(eq(news.id, id)).limit(1);
     return rows[0] ?? null;
+  },
+
+  async findPublishedByIds(ids: number[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const idList = ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    if (idList.length === 0) {
+      return [];
+    }
+
+    const ordering = sql.join(
+      idList.map((id, index) => sql`WHEN ${news.id} = ${id} THEN ${index}`),
+      sql.raw(" ")
+    );
+
+    return db
+      .select({
+        id: news.id,
+        title: news.title,
+        slug: news.slug,
+        summary: news.summary,
+        content: news.content,
+        imageUrl: news.imageUrl,
+        status: news.status,
+        publishedAt: news.publishedAt,
+        viewCount: news.viewCount,
+        categoryId: news.categoryId,
+        categorySlug: categories.slug,
+        createdAt: news.createdAt,
+        updatedAt: news.updatedAt
+      })
+      .from(news)
+      .leftJoin(categories, eq(categories.id, news.categoryId))
+        .where(and(eq(news.status, "PUBLISHED"), inArray(news.id, idList)))
+      .orderBy(sql`CASE ${ordering} ELSE ${idList.length} END`);
+  },
+
+  async searchPublishedByKeyword(params: { query: string; limit: number; categoryId?: number; categorySlug?: string }) {
+    const query = params.query.trim().toLowerCase();
+    if (!query) {
+      return [];
+    }
+
+    const likePattern = `%${query}%`;
+    const conditions = [
+      eq(news.status, "PUBLISHED"),
+      or(
+        sql`LOWER(${news.title}) LIKE ${likePattern}`,
+        sql`LOWER(${news.summary}) LIKE ${likePattern}`,
+        sql`LOWER(${news.content}) LIKE ${likePattern}`
+      )
+    ];
+
+    if (params.categoryId !== undefined) {
+      conditions.push(eq(news.categoryId, params.categoryId));
+    }
+
+    if (params.categorySlug !== undefined) {
+      conditions.push(eq(categories.slug, params.categorySlug));
+    }
+
+    return db
+      .select({
+        id: news.id,
+        title: news.title,
+        slug: news.slug,
+        summary: news.summary,
+        content: news.content,
+        imageUrl: news.imageUrl,
+        status: news.status,
+        publishedAt: news.publishedAt,
+        viewCount: news.viewCount,
+        categoryId: news.categoryId,
+        categorySlug: categories.slug,
+        createdAt: news.createdAt,
+        updatedAt: news.updatedAt
+      })
+      .from(news)
+      .leftJoin(categories, eq(categories.id, news.categoryId))
+      .where(and(...conditions))
+      .orderBy(desc(news.publishedAt), desc(news.id))
+      .limit(params.limit);
   },
 
   async findNewerSibling(current: { id: number; publishedAt: Date | null }) {

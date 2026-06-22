@@ -2,6 +2,8 @@ import { eq, sql } from "drizzle-orm";
 import { db } from "../db/client";
 import { news } from "../db/schema";
 import { viewRepo } from "../repositories/view.repo";
+import { recordUserViewEvent } from "../personalization/store";
+import { addPersistentSignal } from "../chat/memory";
 
 function todayUtcDateString(timestamp: string): string {
   const date = new Date(timestamp);
@@ -17,7 +19,7 @@ export const viewCounterService = {
    * upserts `NewsViewDaily(news_id, today)`. Returns true when the event was
    * applied, false when the target article was missing or not published.
    */
-  async applyViewEvent(event: { articleId: number; timestamp: string }): Promise<boolean> {
+  async applyViewEvent(event: { articleId: number; timestamp: string; viewerId?: string }): Promise<boolean> {
     const rows = await db
       .select({ id: news.id, status: news.status })
       .from(news)
@@ -39,6 +41,18 @@ export const viewCounterService = {
       // Postgres serializes via row locks; tests cover correctness.
     });
     await viewRepo.upsertAndIncrementToday(event.articleId, day);
+    if (event.viewerId) {
+      await recordUserViewEvent({
+        userId: event.viewerId,
+        articleId: event.articleId,
+        timestamp: event.timestamp
+      });
+
+      await addPersistentSignal(event.viewerId, {
+        type: "article_view",
+        articleId: event.articleId
+      });
+    }
     return true;
   }
 };

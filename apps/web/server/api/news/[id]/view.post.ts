@@ -2,6 +2,9 @@ import { newsRepo } from "~/server/repositories/news.repo";
 import { getQueueAdapter } from "~/server/queue";
 import { QUEUE_NAMES, type ViewEventData } from "~/server/queue/types";
 import { AppError, NotFoundError } from "~/server/services/errors";
+import { requireAdmin } from "~/server/utils/auth";
+import { getCookie, setCookie } from "h3";
+import { randomUUID } from "node:crypto";
 
 export default defineEventHandler(async (event) => {
   try {
@@ -16,9 +19,27 @@ export default defineEventHandler(async (event) => {
       throw new NotFoundError("Article", String(articleId));
     }
 
+    let viewerId: string | undefined;
+    try {
+      const admin = await requireAdmin(event);
+      viewerId = `admin:${admin.username}`;
+    } catch {
+      const existing = getCookie(event, "mnp_viewer_id");
+      viewerId = existing || `anon:${randomUUID()}`;
+      if (!existing) {
+        setCookie(event, "mnp_viewer_id", viewerId, {
+          httpOnly: true,
+          sameSite: "lax",
+          maxAge: 60 * 60 * 24 * 90,
+          path: "/"
+        });
+      }
+    }
+
     const payload: ViewEventData = {
       articleId,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      viewerId
     };
 
     const queue = await getQueueAdapter();

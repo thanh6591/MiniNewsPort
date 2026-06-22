@@ -1,6 +1,7 @@
 import { access, readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { BULK_IMPORT_DEEP_DIVE_STAGES } from "~/pages/diagrams/bulk-import-messaging.deep-dive";
+import { VECTOR_SEARCH_RECOMMENDATION_RAG_CHATBOT_DEEP_DIVE_STAGES } from "~/pages/diagrams/vector-search-recommendation-rag-chatbot.deep-dive";
 
 type AllowedReference = {
   filePath: string;
@@ -13,9 +14,10 @@ const snippetLinesBefore = 4;
 const snippetLinesAfter = 20;
 
 const allowedReferences = new Set<string>(
-  BULK_IMPORT_DEEP_DIVE_STAGES.flatMap((stage) =>
-    stage.functionWalkthrough.map((reference) => buildReferenceKey(reference))
-  )
+  [
+    ...BULK_IMPORT_DEEP_DIVE_STAGES,
+    ...VECTOR_SEARCH_RECOMMENDATION_RAG_CHATBOT_DEEP_DIVE_STAGES
+  ].flatMap((stage) => stage.functionWalkthrough.map((reference) => buildReferenceKey(reference)))
 );
 
 function buildReferenceKey(reference: AllowedReference): string {

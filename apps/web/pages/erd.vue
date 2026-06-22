@@ -25,6 +25,11 @@
         <h2 class="text-lg font-semibold text-slate-900">Bulk Import & Messaging</h2>
         <p class="mt-2 text-sm text-slate-600">Detailed queue flow with a beginner-friendly backend deep-dive tab for code-level learning.</p>
       </NuxtLink>
+
+      <NuxtLink to="/diagrams/vector-search-recommendation-rag-chatbot" class="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow">
+        <h2 class="text-lg font-semibold text-slate-900">Vector Search & RAG Chatbot</h2>
+        <p class="mt-2 text-sm text-slate-600">Semantic search, recommendations, personalized feed, memory tiers, and chatbot flow with code deep-dive.</p>
+      </NuxtLink>
     </div>
     
   </section>

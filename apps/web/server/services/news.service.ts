@@ -2,6 +2,14 @@ import { newsRepo, type NewsCreateInput, type NewsUpdateInput } from "../reposit
 import { viewRepo } from "../repositories/view.repo";
 import { categoryService } from "./category.service";
 import { NotFoundError, ConflictError, ValidationError, CategoryNotFoundError } from "./errors";
+import { deleteArticleEmbedding, upsertArticleEmbedding } from "../vector/indexer";
+import { logVectorDlq } from "../vector/dlq";
+import { createEmbeddingProvider } from "../ai/providers";
+import { getAiRuntimeSettings } from "../ai/runtime";
+import { createRetrievalServiceFromRuntimeConfig } from "./retrieval.service";
+import { buildArticleEmbeddingPayload } from "../vector/article-embedding-payload";
+import { getRecentUserViewArticleIds } from "../personalization/store";
+import { logTelemetry } from "../utils/telemetry";
 
 function hasOwn(obj: object, key: string) {
   return Object.prototype.hasOwnProperty.call(obj, key);
@@ -113,6 +121,297 @@ export const newsService = {
     return viewRepo.topByDate(todayValue, limit);
   },
 
+  async semanticSearch(filters: {
+    query: string;
+    limit: number;
+    categoryId?: number;
+    categorySlug?: string;
+  }) {
+    const query = (filters.query || "").trim();
+    const limit = Math.max(1, Math.min(filters.limit || 20, 50));
+
+    if (!query) {
+      throw new ValidationError("Validation failed", [
+        {
+          field: "query.q",
+          message: "q is required for semantic search"
+        }
+      ]);
+    }
+
+    const categorySlug = filters.categorySlug ??
+      (filters.categoryId !== undefined ? (await categoryService.getById(filters.categoryId)).slug : undefined);
+
+    const config = useRuntimeConfig();
+    const aiSettings = getAiRuntimeSettings(config);
+
+    const startedAt = Date.now();
+    try {
+      const embeddingProvider = createEmbeddingProvider(aiSettings);
+      const [queryVector] = await embeddingProvider.embed([query]);
+
+      if (!Array.isArray(queryVector) || queryVector.length === 0) {
+        throw new Error("Empty query embedding");
+      }
+
+      const retrieval = createRetrievalServiceFromRuntimeConfig(config);
+      const candidates = await retrieval.search({
+        queryVector,
+        queryText: query,
+        limit,
+        category: categorySlug
+      });
+
+      const ids = candidates.map((item) => item.articleId);
+      const articles = await newsRepo.findPublishedByIds(ids);
+      const scoreById = new Map(candidates.map((item) => [item.articleId, item.score]));
+
+      const response = {
+        items: articles,
+        metadata: {
+          fallback: false,
+          strategy: "vector",
+          scores: articles.map((item) => ({
+            articleId: item.id,
+            score: scoreById.get(item.id) ?? 0
+          }))
+        }
+      };
+
+      await logTelemetry("semantic_search", {
+        strategy: "vector",
+        fallback: false,
+        latencyMs: Date.now() - startedAt,
+        resultCount: articles.length
+      });
+
+      return response;
+    } catch (error) {
+      const items = await newsRepo.searchPublishedByKeyword({
+        query,
+        limit,
+        categoryId: filters.categoryId,
+        categorySlug
+      });
+
+      const response = {
+        items,
+        metadata: {
+          fallback: true,
+          strategy: "keyword",
+          reason: error instanceof Error ? error.message : "vector retrieval unavailable",
+          scores: items.map((item, index) => ({
+            articleId: item.id,
+            score: Math.max(0, 1 - index / Math.max(items.length, 1))
+          }))
+        }
+      };
+
+      await logTelemetry("semantic_search", {
+        strategy: "keyword",
+        fallback: true,
+        latencyMs: Date.now() - startedAt,
+        resultCount: items.length
+      });
+
+      return response;
+    }
+  },
+
+  async similarRecommendationsBySlug(slug: string, limit: number = 6) {
+    const startedAt = Date.now();
+    const article = await newsRepo.findBySlug(slug, "PUBLISHED");
+    if (!article) {
+      throw new NotFoundError("Article", slug);
+    }
+
+    const category = await categoryService.getById(article.categoryId);
+    const config = useRuntimeConfig();
+    const aiSettings = getAiRuntimeSettings(config);
+    const embeddingProvider = createEmbeddingProvider(aiSettings);
+    const retrieval = createRetrievalServiceFromRuntimeConfig(config);
+
+    const payload = buildArticleEmbeddingPayload({
+      articleId: article.id,
+      title: article.title,
+      summary: article.summary,
+      description: article.content,
+      source: "internal",
+      category: category.slug,
+      publishedAt: article.publishedAt,
+      indexVersion: 1
+    });
+
+    const [vector] = await embeddingProvider.embed([payload.text]);
+    if (!Array.isArray(vector) || vector.length === 0) {
+      throw new Error("Unable to build similarity vector for article");
+    }
+
+    const [inCategoryCandidates, globalCandidates] = await Promise.all([
+      retrieval.similar({
+        articleVector: vector,
+        queryText: `${article.title}\n${article.summary}`,
+        category: category.slug,
+        limit: limit + 3,
+        excludeArticleIds: [article.id]
+      }),
+      retrieval.similar({
+        articleVector: vector,
+        queryText: `${article.title}\n${article.summary}`,
+        limit: limit + 6,
+        excludeArticleIds: [article.id]
+      })
+    ]);
+
+    const inCategoryIds = inCategoryCandidates.map((item) => item.articleId).slice(0, limit);
+    const inCategoryArticles = await newsRepo.findPublishedByIds(inCategoryIds);
+
+    const excluded = new Set<number>([article.id, ...inCategoryIds]);
+    const globalIds = globalCandidates
+      .map((item) => item.articleId)
+      .filter((id) => !excluded.has(id))
+      .slice(0, limit);
+
+    const globalArticles = await newsRepo.findPublishedByIds(globalIds);
+
+    const response = {
+      sourceArticleId: article.id,
+      categorySlug: category.slug,
+      inCategory: inCategoryArticles,
+      global: globalArticles
+    };
+
+    await logTelemetry("article_recommendations", {
+      sourceArticleId: article.id,
+      inCategoryCount: inCategoryArticles.length,
+      globalCount: globalArticles.length,
+      latencyMs: Date.now() - startedAt
+    });
+
+    return response;
+  },
+
+  async personalizedRecommendations(params: { userId: string; limit: number }) {
+    const startedAt = Date.now();
+    const limit = Math.max(1, Math.min(params.limit, 12));
+    const historyArticleIds = await getRecentUserViewArticleIds(params.userId, 20);
+
+    const fallbackItems = async () => {
+      const fallback = await this.mostViewedToday(limit);
+      const fallbackIds = fallback.map((item) => item.newsId).filter((id) => Number.isInteger(id));
+      return newsRepo.findPublishedByIds(fallbackIds);
+    };
+
+    if (historyArticleIds.length < 3) {
+      const fallback = await fallbackItems();
+      const response = {
+        items: fallback,
+        metadata: {
+          personalized: false,
+          fallback: true,
+          reason: "insufficient_history"
+        }
+      };
+
+      await logTelemetry("personalized_recommendations", {
+        userId: params.userId,
+        personalized: false,
+        reason: "insufficient_history",
+        latencyMs: Date.now() - startedAt
+      });
+
+      return response;
+    }
+
+    const readArticles = await newsRepo.findPublishedByIds(historyArticleIds);
+    const combinedProfileText = readArticles
+      .map((article) => `${article.title}\n${article.summary}`)
+      .join("\n\n");
+
+    if (!combinedProfileText.trim()) {
+      const fallback = await fallbackItems();
+      return {
+        items: fallback,
+        metadata: {
+          personalized: false,
+          fallback: true,
+          reason: "empty_profile"
+        }
+      };
+    }
+
+    const config = useRuntimeConfig();
+    const aiSettings = getAiRuntimeSettings(config);
+    const embeddingProvider = createEmbeddingProvider(aiSettings);
+    const retrieval = createRetrievalServiceFromRuntimeConfig(config);
+
+    try {
+      const [userVector] = await embeddingProvider.embed([combinedProfileText]);
+      if (!Array.isArray(userVector) || userVector.length === 0) {
+        throw new Error("empty user vector");
+      }
+
+      const candidates = await retrieval.recommendForUser({
+        userVector,
+        queryText: combinedProfileText,
+        limit,
+        excludeArticleIds: historyArticleIds
+      });
+
+      const items = await newsRepo.findPublishedByIds(candidates.map((item) => item.articleId));
+      if (items.length === 0) {
+        const fallback = await fallbackItems();
+        return {
+          items: fallback,
+          metadata: {
+            personalized: false,
+            fallback: true,
+            reason: "no_candidates"
+          }
+        };
+      }
+
+      const response = {
+        items,
+        metadata: {
+          personalized: true,
+          fallback: false,
+          sourceHistoryCount: historyArticleIds.length
+        }
+      };
+
+      await logTelemetry("personalized_recommendations", {
+        userId: params.userId,
+        personalized: true,
+        fallback: false,
+        latencyMs: Date.now() - startedAt,
+        resultCount: items.length
+      });
+
+      return response;
+    } catch (error) {
+      const fallback = await fallbackItems();
+      const response = {
+        items: fallback,
+        metadata: {
+          personalized: false,
+          fallback: true,
+          reason: error instanceof Error ? error.message : "personalization_failed"
+        }
+      };
+
+      await logTelemetry("personalized_recommendations", {
+        userId: params.userId,
+        personalized: false,
+        fallback: true,
+        reason: error instanceof Error ? error.message : "personalization_failed",
+        latencyMs: Date.now() - startedAt
+      });
+
+      return response;
+    }
+  },
+
   async create(input: NewsCreateInput) {
     validateRequiredNewsInput(input as unknown as Record<string, unknown>, "create");
     await assertCategoryExists(input.categoryId);
@@ -135,7 +434,32 @@ export const newsService = {
       ]);
     }
 
-    return newsRepo.create(input);
+    const created = await newsRepo.create(input);
+    const category = await categoryService.getById(created.categoryId);
+
+    // Indexing is best-effort here; later tasks add queue retries and DLQ handling.
+    try {
+      await upsertArticleEmbedding({
+        id: created.id,
+        title: created.title,
+        summary: created.summary,
+        content: created.content,
+        publishedAt: created.publishedAt,
+        categorySlug: category.slug
+      });
+    } catch (error) {
+      console.error(`[vector-index] failed to upsert embedding for article ${created.id}`, error);
+      await logVectorDlq({
+        operation: "upsert",
+        articleId: created.id,
+        reason: error instanceof Error ? error.message : "unknown indexing error",
+        context: {
+          phase: "create"
+        }
+      });
+    }
+
+    return created;
   },
 
   async update(id: number, input: NewsUpdateInput) {
@@ -171,7 +495,34 @@ export const newsService = {
       ]);
     }
 
-    return newsRepo.update(id, input);
+    const updated = await newsRepo.update(id, input);
+    if (!updated) {
+      throw new NotFoundError("Article", String(id));
+    }
+
+    const category = await categoryService.getById(updated.categoryId);
+    try {
+      await upsertArticleEmbedding({
+        id: updated.id,
+        title: updated.title,
+        summary: updated.summary,
+        content: updated.content,
+        publishedAt: updated.publishedAt,
+        categorySlug: category.slug
+      });
+    } catch (error) {
+      console.error(`[vector-index] failed to upsert embedding for article ${updated.id}`, error);
+      await logVectorDlq({
+        operation: "upsert",
+        articleId: updated.id,
+        reason: error instanceof Error ? error.message : "unknown indexing error",
+        context: {
+          phase: "update"
+        }
+      });
+    }
+
+    return updated;
   },
 
   async delete(id: number) {
@@ -183,6 +534,20 @@ export const newsService = {
     const deleted = await newsRepo.delete(id);
     if (!deleted) {
       throw new NotFoundError("Article", String(id));
+    }
+
+    try {
+      await deleteArticleEmbedding(id);
+    } catch (error) {
+      console.error(`[vector-index] failed to delete embedding for article ${id}`, error);
+      await logVectorDlq({
+        operation: "delete",
+        articleId: id,
+        reason: error instanceof Error ? error.message : "unknown indexing error",
+        context: {
+          phase: "delete"
+        }
+      });
     }
 
     return true;

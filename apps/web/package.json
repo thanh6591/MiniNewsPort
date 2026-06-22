@@ -11,6 +11,8 @@
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:migrate": "tsx server/db/migrate.ts",
     "db:seed": "tsx server/db/seed.ts",
+    "vector:backfill": "tsx server/workers/vector-backfill.ts",
+    "memory:compact": "tsx server/workers/memory-semantic-compaction.ts",
     "worker": "tsx server/workers/run.ts",
     "postinstall": "nuxt prepare"
   },

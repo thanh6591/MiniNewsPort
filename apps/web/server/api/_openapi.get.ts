@@ -59,6 +59,22 @@ export default defineEventHandler(() => {
           }
         }
       },
+      "/api/news/search": {
+        get: {
+          tags: ["Public"],
+          summary: "Semantic free-text search with optional category filtering",
+          parameters: [
+            { name: "q", in: "query", required: true, schema: { type: "string" } },
+            { name: "limit", in: "query", schema: { type: "integer", default: 20, maximum: 50 } },
+            { name: "categoryId", in: "query", schema: { type: "integer" } },
+            { name: "categorySlug", in: "query", schema: { type: "string" } }
+          ],
+          responses: {
+            "200": { description: "Semantic search results with metadata contract" },
+            "400": { description: "Invalid query input" }
+          }
+        }
+      },
       "/api/news/most-viewed-today": {
         get: {
           tags: ["Public"],
@@ -77,6 +93,62 @@ export default defineEventHandler(() => {
             "200": { description: "Article detail with neighboring article slugs" },
             "404": { description: "Article not found" }
           }
+        }
+      },
+      "/api/news/{slug}/recommendations": {
+        get: {
+          tags: ["Public"],
+          summary: "Get in-category and global similar article recommendations",
+          parameters: [
+            { name: "slug", in: "path", required: true, schema: { type: "string" } },
+            { name: "limit", in: "query", schema: { type: "integer", default: 6, maximum: 12 } }
+          ],
+          responses: {
+            "200": { description: "Dual recommendation sections for article detail" },
+            "404": { description: "Article not found" }
+          }
+        }
+      },
+      "/api/news/recommendations/personalized": {
+        get: {
+          tags: ["Public"],
+          summary: "Get personalized recommendation feed for authenticated user",
+          parameters: [{ name: "limit", in: "query", schema: { type: "integer", default: 8, maximum: 12 } }],
+          responses: {
+            "200": { description: "Personalized or cold-start fallback recommendation feed" },
+            "401": { description: "Authentication required" }
+          }
+        }
+      },
+      "/api/chat/query": {
+        post: {
+          tags: ["Public"],
+          summary: "Ask chatbot over article knowledge with memory-aware context",
+          responses: {
+            "200": { description: "Structured chat response with article cards and follow-ups" }
+          }
+        }
+      },
+      "/api/chat/memory": {
+        get: {
+          tags: ["Public"],
+          summary: "Get current chat memory mode and preference state"
+        },
+        delete: {
+          tags: ["Public"],
+          summary: "Delete selected chat memory tiers for authenticated user"
+        }
+      },
+      "/api/chat/memory/reset": {
+        post: {
+          tags: ["Public"],
+          summary: "Reset session-only chat memory"
+        }
+      },
+      "/api/chat/memory/preferences": {
+        post: {
+          tags: ["Public"],
+          summary: "Update persistent/agent memory preferences for authenticated user"
         }
       },
       "/api/auth/login": {

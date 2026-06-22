@@ -1,6 +1,8 @@
 import { sql } from "drizzle-orm";
 import { setResponseStatus } from "h3";
 import { db } from "~/server/db/client";
+import { checkOllamaConnection, getAiRuntimeSettings } from "~/server/ai/runtime";
+import { checkQdrantConnection, getQdrantRuntimeSettings } from "~/server/vector/qdrant";
 
 const REQUIRED_TABLES = ["categories", "news", "news_view_daily"] as const;
 
@@ -51,6 +53,7 @@ async function checkMigrationState(databaseUrl: string) {
 }
 
 export default defineEventHandler(async (event) => {
+  const config = useRuntimeConfig(event);
   const databaseUrl = process.env.DATABASE_URL ?? "";
   const checks: Record<string, any> = {};
   let healthy = true;
@@ -83,6 +86,56 @@ export default defineEventHandler(async (event) => {
       ok: false,
       error: "Skipped because database check failed"
     };
+  }
+
+  const qdrantSettings = getQdrantRuntimeSettings(config);
+  if (!qdrantSettings.enabled) {
+    checks.qdrant = {
+      ok: true,
+      skipped: true,
+      reason: "Qdrant disabled via runtime config",
+      url: qdrantSettings.url,
+      collection: qdrantSettings.articleCollection
+    };
+  } else {
+    try {
+      checks.qdrant = await checkQdrantConnection(qdrantSettings);
+      checks.qdrant.url = qdrantSettings.url;
+      checks.qdrant.collection = qdrantSettings.articleCollection;
+      if (!checks.qdrant.ok) {
+        healthy = false;
+      }
+    } catch (error: any) {
+      healthy = false;
+      checks.qdrant = {
+        ok: false,
+        error: error?.message ?? "Qdrant connection check failed",
+        url: qdrantSettings.url,
+        collection: qdrantSettings.articleCollection
+      };
+    }
+  }
+
+  const aiSettings = getAiRuntimeSettings(config);
+  if (!aiSettings.enabled) {
+    checks.ollama = {
+      ok: true,
+      skipped: true,
+      reason: "Ollama disabled via runtime config"
+    };
+  } else {
+    try {
+      checks.ollama = await checkOllamaConnection(aiSettings);
+      if (!checks.ollama.ok) {
+        healthy = false;
+      }
+    } catch (error: any) {
+      healthy = false;
+      checks.ollama = {
+        ok: false,
+        error: error?.message ?? "Ollama connection check failed"
+      };
+    }
   }
 
   if (!healthy) {

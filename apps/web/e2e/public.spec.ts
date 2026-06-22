@@ -51,6 +51,50 @@ test.describe("Public News Site", () => {
     await expect(page.locator("text=Most Viewed Today")).toBeVisible();
   });
 
+  test("should show semantic search controls and allow filtered search", async ({ page }) => {
+    await page.goto("/");
+
+    await expect(page.getByTestId("semantic-search-section")).toBeVisible();
+    await page.getByTestId("semantic-search-input").fill("latest technology policy updates");
+    await page.getByTestId("semantic-search-category").selectOption({ index: 0 });
+    await page.getByTestId("semantic-search-button").click();
+
+    await expect(
+      page.getByTestId("semantic-search-results").or(page.getByTestId("semantic-search-empty"))
+    ).toBeVisible();
+  });
+
+  test("should render chatbot and exactly 3 follow-up suggestions", async ({ page }) => {
+    await page.goto("/");
+
+    await page.getByTestId("chat-launcher").click();
+    await expect(page.getByTestId("chatbot-panel")).toBeVisible();
+    await page.getByTestId("chat-input").fill("What are important trends today?");
+    await page.getByTestId("chat-send").click();
+
+    await expect(page.getByTestId("chat-followups")).toBeVisible();
+    await expect(page.getByTestId("chat-followups").locator("button")).toHaveCount(3);
+  });
+
+  test("should display dual recommendation sections on article detail", async ({ page }) => {
+    await page.goto("/");
+    await page.click("a[href^='/news/']");
+
+    await expect(page.getByTestId("article-recommendations-section")).toBeVisible();
+    await expect(page.locator("text=Similar In This Category")).toBeVisible();
+    await expect(page.locator("text=You Might Also Explore")).toBeVisible();
+  });
+
+  test("should show personalized recommendation section for authenticated user", async ({ page }) => {
+    await page.goto("/admin/login");
+    await page.getByPlaceholder("Username").fill("admin");
+    await page.getByPlaceholder("Password").fill("admin123");
+    await page.getByRole("button", { name: "Login" }).click();
+
+    await page.goto("/");
+    await expect(page.getByTestId("personalized-section")).toBeVisible();
+  });
+
   test("should have responsive navigation in header", async ({ page }, testInfo) => {
     await page.goto("/");
 

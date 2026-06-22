@@ -44,6 +44,7 @@ export type ScrapeJobData = {
 export type ViewEventData = {
   articleId: number;
   timestamp: string;
+  viewerId?: string;
 };
 
 export type DlqPayload<T> = {
