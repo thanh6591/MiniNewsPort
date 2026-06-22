@@ -89,6 +89,10 @@ export const newsService = {
     });
   },
 
+  async listAll(filters: { page: number; limit: number; categoryId?: number; status?: "DRAFT" | "PUBLISHED" }) {
+    return newsRepo.list(filters);
+  },
+
   async getDetailBySlug(slug: string) {
     const article = await newsRepo.findBySlug(slug, "PUBLISHED");
     if (!article) {

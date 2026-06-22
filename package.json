@@ -21,7 +21,7 @@
     "db:migrate": "pnpm --dir apps/web db:migrate",
     "db:seed": "pnpm --dir apps/web db:seed",
     "db:studio": "cd apps/web && pnpm drizzle-kit studio",
-    "stack:up": "pnpm infra:down && pnpm infra:up && pnpm db:migrate && pnpm db:seed && (pnpm dev & pnpm worker:up & wait)",
+    "stack:up": "pnpm infra:down && pnpm infra:up && pnpm db:migrate && pnpm db:seed && (pnpm dev & pnpm worker:up & wait)"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

@@ -15,6 +15,13 @@
       "when": 1779804086064,
       "tag": "0001_new_prima",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1782120416326,
+      "tag": "0002_green_corsair",
+      "breakpoints": true
     }
   ]
 }

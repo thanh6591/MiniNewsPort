@@ -1,6 +1,5 @@
 import { categoryRepo } from "../repositories/category.repo";
-import { newsRepo } from "../repositories/news.repo";
-import { CategoryHasNewsError, NotFoundError, ConflictError, ValidationError } from "./errors";
+import { NotFoundError, ConflictError, ValidationError } from "./errors";
 
 function validateCategoryInput(input: { name?: string; slug?: string }, isCreate = false) {
   const details: Array<{ field: string; message: string }> = [];
@@ -76,16 +75,6 @@ export const categoryService = {
     const category = await categoryRepo.findById(id);
     if (!category) {
       throw new NotFoundError("Category", String(id));
-    }
-
-    const { total } = await newsRepo.list({
-      page: 1,
-      limit: 1,
-      categoryId: id
-    });
-
-    if (total > 0) {
-      throw new CategoryHasNewsError(id, total);
     }
 
     const deleted = await categoryRepo.delete(id);

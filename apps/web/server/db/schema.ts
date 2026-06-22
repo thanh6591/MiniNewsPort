@@ -47,7 +47,7 @@ export const news = pgTable(
     viewCount: integer("view_count").default(0).notNull(),
     categoryId: integer("category_id")
       .notNull()
-      .references(() => categories.id, { onDelete: "restrict" }),
+      .references(() => categories.id, { onDelete: "cascade" }),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
   },
@@ -78,7 +78,7 @@ export const importBatches = pgTable("import_batches", {
   id: serial("id").primaryKey(),
   categoryId: integer("category_id")
     .notNull()
-    .references(() => categories.id, { onDelete: "restrict" }),
+    .references(() => categories.id, { onDelete: "cascade" }),
   totalCount: integer("total_count").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()

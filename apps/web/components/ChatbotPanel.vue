@@ -52,6 +52,8 @@
           data-testid="chat-input"
           :disabled="isSending"
           @keydown.enter.prevent="send"
+          @compositionstart="isComposing = true"
+          @compositionend="isComposing = false"
         />
         <button
           type="button"
@@ -122,6 +124,7 @@ const messages = ref<ChatMessage[]>([]);
 const followUps = ref<string[]>([]);
 const isOpen = ref(false);
 const isSending = ref(false);
+const isComposing = ref(false);
 const messagesContainer = ref<HTMLElement | null>(null);
 
 function isUserRole(role: string) {
@@ -158,7 +161,7 @@ async function resetSession() {
 
 async function send() {
   const text = prompt.value.trim();
-  if (!text || isSending.value) return;
+  if (!text || isSending.value || isComposing.value) return;
 
   messages.value.push({ role: "user", content: text });
   prompt.value = "";
