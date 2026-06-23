@@ -29,11 +29,16 @@
 
       <button
         type="button"
-        class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+        class="flex min-w-[88px] items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
         data-testid="semantic-search-button"
+        :disabled="loading"
         @click="runSearch"
       >
-        Search
+        <svg v-if="loading" class="h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 0 1 8-8V0C5.4 0 0 5.4 0 12h4Z" />
+        </svg>
+        <span v-else>Search</span>
       </button>
     </div>
 
@@ -41,7 +46,18 @@
       Strategy: {{ metadata.strategy }}<span v-if="metadata.fallback"> (fallback)</span>
     </p>
 
-    <div v-if="results.length > 0" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="semantic-search-results">
+    <div v-if="loading" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="semantic-search-loading">
+      <div v-for="n in 3" :key="n" class="animate-pulse overflow-hidden rounded-xl border border-slate-200">
+        <div class="h-40 w-full bg-slate-200"></div>
+        <div class="space-y-2 p-4">
+          <div class="h-4 w-3/4 rounded bg-slate-200"></div>
+          <div class="h-3 w-full rounded bg-slate-100"></div>
+          <div class="h-3 w-5/6 rounded bg-slate-100"></div>
+        </div>
+      </div>
+    </div>
+
+    <div v-else-if="results.length > 0" class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3" data-testid="semantic-search-results">
       <NewsCard v-for="item in results" :key="item.id" :news="item" />
     </div>
 
@@ -62,6 +78,7 @@ const selectedCategory = ref("");
 const results = ref<News[]>([]);
 const metadata = ref<{ fallback?: boolean; strategy?: string } | null>(null);
 const searched = ref(false);
+const loading = ref(false);
 
 async function runSearch() {
   const q = query.value.trim();
@@ -80,15 +97,20 @@ async function runSearch() {
     params.set("categorySlug", selectedCategory.value);
   }
 
-  const response = await fetch(`/api/news/search?${params.toString()}`).then((res) => {
-    if (!res.ok) {
-      throw new Error("Semantic search request failed");
-    }
-    return res.json() as Promise<{ items: News[]; metadata?: { fallback?: boolean; strategy?: string } }>;
-  });
+  loading.value = true;
+  try {
+    const response = await fetch(`/api/news/search?${params.toString()}`).then((res) => {
+      if (!res.ok) {
+        throw new Error("Semantic search request failed");
+      }
+      return res.json() as Promise<{ items: News[]; metadata?: { fallback?: boolean; strategy?: string } }>;
+    });
 
-  results.value = response.items || [];
-  metadata.value = response.metadata || null;
-  searched.value = true;
+    results.value = response.items || [];
+    metadata.value = response.metadata || null;
+    searched.value = true;
+  } finally {
+    loading.value = false;
+  }
 }
 </script>

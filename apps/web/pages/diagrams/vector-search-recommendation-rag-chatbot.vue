@@ -28,7 +28,7 @@
 
     <div v-show="activeTab === 'diagram'" id="vector-search-panel-diagram" data-testid="vector-search-panel-diagram" class="space-y-4">
       <div class="overflow-x-auto rounded-xl border border-slate-200 bg-gradient-to-b from-white to-slate-50 p-4 shadow-sm sm:p-6">
-        <div ref="diagramContainer" class="diagram-shell min-h-[760px] min-w-[1200px]"></div>
+        <div ref="diagramContainer" class="diagram-shell min-h-[500px] min-w-[760px]"></div>
       </div>
 
       <div class="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-700 shadow-sm sm:p-5">
@@ -37,7 +37,6 @@
           <li>Embeddings are generated locally with Ollama and stored in Qdrant.</li>
           <li>Semantic search and recommendation endpoints read from the same vector index.</li>
           <li>The chatbot combines article retrieval with session, persistent, and agent memory.</li>
-          <li>Chat follow-up questions are always capped at exactly three actions in the UI.</li>
         </ul>
       </div>
 
@@ -286,27 +285,27 @@ flowchart TB
   end
 
   subgraph Search[2. Semantic search]
-    direction TB
+    direction LR
     U1["Search box + category filter"]:::ui --> S1["/api/news/search"]:::api --> S2["newsService.semanticSearch"]:::api --> S3["retrieval.search"]:::worker --> S4["keyword fallback"]:::worker
   end
 
   subgraph Recommend[3. Recommendations]
-    direction TB
+    direction LR
     U2["Article detail page"]:::ui --> R1["/api/news/:slug/recommendations"]:::api --> R2["similarRecommendationsBySlug"]:::api --> R3["retrieval.similar"]:::worker --> R4["in-category + global lists"]:::db
   end
 
   subgraph Personalize[4. Personalized feed]
-    direction TB
+    direction LR
     U3["Homepage personalized section"]:::ui --> P1["/api/news/recommendations/personalized"]:::api --> P2["personalizedRecommendations"]:::api --> P3["getRecentUserViewArticleIds"]:::worker --> P4["retrieval.recommendForUser"]:::worker
   end
 
   subgraph Chat[5. RAG chatbot + memory]
-    direction TB
-    U4["Floating chat launcher"]:::ui --> C1["/api/chat/query"]:::api --> C2["resolveMemoryContext"]:::worker --> C3["chatService.ask"]:::api --> C4["semanticSearch + personalizedRecommendations"]:::api --> C5["appendSessionTurn + addEpisodicEvent"]:::worker --> C6["Ollama answer generation"]:::ai --> C7["exactly 3 follow-up questions"]:::worker
+    direction LR
+    U4["Floating chat launcher"]:::ui --> C1["/api/chat/query"]:::api --> C2["resolveMemoryContext"]:::worker --> C3["chatService.ask"]:::api --> C4["semanticSearch + personalizedRecommendations"]:::api --> C5["appendSessionTurn + addEpisodicEvent"]:::worker --> C6["Ollama answer generation"]:::ai
   end
 
   subgraph Memory[6. Memory controls]
-    direction TB
+    direction LR
     M1["GET /api/chat/memory"]:::api --> M2["getMemoryPreferences"]:::worker --> M3["Reset session memory"]:::api --> M4["resetSessionMemory"]:::worker --> M5["Preference / deletion endpoints"]:::api --> M6["updateMemoryPreferences + deleteMemoryTiers"]:::worker
   end
 
@@ -315,7 +314,7 @@ flowchart TB
   S4 --> U2
   R4 --> U3
   P4 --> U4
-  C7 --> M1
+  C6 --> M1
 `;
 
 onMounted(async () => {
@@ -331,15 +330,15 @@ onMounted(async () => {
       securityLevel: "loose",
       themeVariables: {
         fontFamily: "ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif",
-        fontSize: "18px",
+        fontSize: "12px",
         primaryTextColor: "#0f172a",
         lineColor: "#64748b",
         tertiaryColor: "#f8fafc"
       },
       flowchart: {
         htmlLabels: true,
-        nodeSpacing: 60,
-        rankSpacing: 80,
+        nodeSpacing: 28,
+        rankSpacing: 40,
         curve: "basis"
       }
     });
@@ -349,8 +348,8 @@ onMounted(async () => {
     const svgEl = diagramContainer.value.querySelector("svg");
     if (svgEl) {
       svgEl.style.maxWidth = "none";
-      svgEl.style.width = "100%";
-      svgEl.style.minWidth = "900px";
+      svgEl.style.width = "66%";
+      svgEl.style.minWidth = "760px";
       svgEl.style.height = "auto";
     }
   } catch (err) {

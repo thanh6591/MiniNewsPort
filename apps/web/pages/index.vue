@@ -2,7 +2,7 @@
   <div class="space-y-8 sm:space-y-10">
     <SemanticSearchSection :categories="categories ?? []" />
     <PersonalizedRecommendations />
-    <MostViewedToday :news="mostViewed ?? []" />
+    <!-- <MostViewedToday :news="mostViewed ?? []" /> -->
     <section class="space-y-6">
       <h1 class="text-2xl font-semibold tracking-tight text-slate-900 sm:text-3xl">Latest News</h1>
       <p v-if="loadError" class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">

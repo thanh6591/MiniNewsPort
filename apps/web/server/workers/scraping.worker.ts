@@ -1,5 +1,8 @@
 import { importRepo } from "../repositories/import.repo";
 import { newsRepo } from "../repositories/news.repo";
+import { categoryRepo } from "../repositories/category.repo";
+import { upsertArticleEmbedding } from "../vector/indexer";
+import { logVectorDlq } from "../vector/dlq";
 import { getQueueAdapter } from "../queue";
 import { QUEUE_NAMES, SCRAPING_RETRY, type ScrapeJobData } from "../queue/types";
 import { HttpFetchError, SelectorMismatchError } from "./errors";
@@ -90,6 +93,29 @@ export async function startScrapingWorker(opts: { concurrency?: number } = {}) {
         throw new Error("Failed to insert news row");
       }
       await importRepo.markItemPublished(data.importItemId, created.id);
+
+      // Index embedding (best-effort) so imported articles are searchable via vector search.
+      try {
+        const category = await categoryRepo.findById(data.categoryId);
+        await upsertArticleEmbedding({
+          id: created.id,
+          title: created.title,
+          summary: created.summary,
+          content: created.content,
+          publishedAt: created.publishedAt,
+          categorySlug: category?.slug ?? null
+        });
+      } catch (indexError) {
+        console.error(`[vector-index] failed to upsert embedding for article ${created.id}`, indexError);
+        await logVectorDlq({
+          operation: "upsert",
+          articleId: created.id,
+          reason: indexError instanceof Error ? indexError.message : "unknown indexing error",
+          context: {
+            phase: "scrape-import"
+          }
+        });
+      }
     } catch (err) {
       const error = err as Error & { retryable?: boolean };
       if (error instanceof SelectorMismatchError) {

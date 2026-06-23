@@ -13,12 +13,12 @@ type ChatArticleCard = {
 };
 
 function buildFollowUpQuestions(message: string, supporting: ChatArticleCard[]) {
-  const seed = message.trim() || "this topic";
-  const titleSeed = supporting[0]?.title || "related developments";
+  const seed = message.trim() || "chủ đề này";
+  const titleSeed = supporting[0]?.title || "các diễn biến liên quan";
   return [
-    `Can you summarize ${seed} in 3 key points?`,
-    `Which article should I read first to understand ${titleSeed}?`,
-    `Show me opposing viewpoints related to this topic.`
+    `Tóm tắt ${seed} trong 3 ý chính?`,
+    `Tôi nên đọc bài nào trước để hiểu "${titleSeed}"?`,
+    `Cho tôi xem các quan điểm trái chiều về chủ đề này.`
   ];
 }
 
@@ -49,14 +49,16 @@ async function generateAnswer(params: {
   ].join("\n\n");
 
   const prompt = [
-    "You are a grounded news assistant.",
-    "Use only provided context. If uncertain, say you need more context.",
+    "Bạn là trợ lý tin tức. Hãy trả lời bằng ĐÚNG ngôn ngữ mà người dùng dùng để hỏi (tiếng Việt hỏi thì trả lời tiếng Việt, tiếng Anh hỏi thì trả lời tiếng Anh). Tuyệt đối không dùng ngôn ngữ khác như tiếng Trung.",
+    "Ưu tiên dựa vào các bài viết được cung cấp bên dưới để trả lời.",
+    "Nếu người dùng hỏi chung chung (ví dụ \"hôm nay có tin gì\"), hãy tóm tắt ngắn gọn các bài viết được cung cấp.",
+    "Chỉ khi hoàn toàn không có bài viết liên quan nào thì mới nói rằng bạn chưa tìm thấy tin phù hợp.",
     contextText,
-    `User question: ${params.message}`
+    `Câu hỏi của người dùng: ${params.message}`
   ].join("\n\n");
 
   if (!ai.enabled) {
-    return `I found ${params.supportingArticles.length} related article(s). Please review the suggestions below.`;
+    return `Tôi tìm thấy ${params.supportingArticles.length} bài viết liên quan. Vui lòng xem các gợi ý bên dưới.`;
   }
 
   const models = [ai.llmPrimaryModel, ai.llmFallbackModel];
@@ -87,7 +89,7 @@ async function generateAnswer(params: {
     }
   }
 
-  return `I found ${params.supportingArticles.length} related article(s). Please review the suggestions below.`;
+  return `Tôi tìm thấy ${params.supportingArticles.length} bài viết liên quan. Vui lòng xem các gợi ý bên dưới.`;
 }
 
 export const chatService = {
@@ -102,13 +104,13 @@ export const chatService = {
     const message = params.message.trim();
     if (!message) {
       const response = {
-        answer: "Please enter a question.",
+        answer: "Vui lòng nhập câu hỏi.",
         supportingArticles: [],
         recommendedArticles: [],
         followUpQuestions: [
-          "What topic are you interested in?",
-          "Do you want recent news or deep background?",
-          "Should I filter by a specific category?"
+          "Bạn quan tâm đến chủ đề nào?",
+          "Bạn muốn tin mới nhất hay thông tin nền chuyên sâu?",
+          "Bạn có muốn lọc theo một chuyên mục cụ thể không?"
         ],
         memoryMode: "session-only",
         sessionId: params.sessionId
