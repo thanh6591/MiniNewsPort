@@ -31,15 +31,40 @@
 
         <div ref="messagesContainer" class="mb-3 flex-1 space-y-2 overflow-y-auto rounded-lg border border-slate-200 p-3" data-testid="chat-messages">
           <p v-if="messages.length === 0" class="text-sm text-slate-500">Ask about any article topic.</p>
+
           <div v-for="(msg, index) in messages" :key="index" class="flex" :class="isUserRole(msg.role) ? 'justify-end' : 'justify-start'">
             <div
               class="max-w-[85%] rounded-2xl px-3 py-2 text-sm leading-relaxed"
-              :class="isUserRole(msg.role)
-                ? 'bg-blue-600 text-white'
-                : 'bg-slate-100 text-slate-800'"
+              :class="isUserRole(msg.role) ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-800'"
             >
-              <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80" :class="isUserRole(msg.role) ? 'text-right' : 'text-left'">{{ displayRole(msg.role) }}</p>
+              <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide opacity-80" :class="isUserRole(msg.role) ? 'text-right' : 'text-left'">
+                {{ displayRole(msg.role) }}
+              </p>
               <p class="whitespace-pre-wrap break-words">{{ msg.content }}</p>
+
+              <Transition name="related-posts-fade">
+                <div v-if="!isUserRole(msg.role) && visibleRelatedPosts(msg).length" class="mt-3 border-t border-slate-200 pt-3">
+                  <p class="mb-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">3 bài liên quan</p>
+                  <TransitionGroup name="related-post-card" tag="div" class="space-y-2">
+                    <NuxtLink
+                      v-for="post in visibleRelatedPosts(msg)"
+                      :key="post.id"
+                      :to="`/news/${post.slug}`"
+                      class="block rounded-xl border border-slate-200 bg-white p-3 transition hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
+                    >
+                      <p class="line-clamp-2 text-sm font-semibold text-slate-900">{{ post.title }}</p>
+                      <p class="mt-1 line-clamp-2 text-xs text-slate-500">{{ post.summary || 'Đọc chi tiết bài viết này.' }}</p>
+                    </NuxtLink>
+                  </TransitionGroup>
+                </div>
+              </Transition>
+            </div>
+          </div>
+
+          <div v-if="streamingAssistant" class="flex justify-start" data-testid="chat-streaming-answer">
+            <div class="max-w-[85%] rounded-2xl bg-slate-100 px-3 py-2 text-sm leading-relaxed text-slate-800">
+              <p class="mb-1 text-[10px] font-semibold uppercase tracking-wide text-left opacity-80">Assistant</p>
+              <p class="whitespace-pre-wrap break-words">{{ streamingAssistant.content }}</p>
             </div>
           </div>
 
@@ -96,9 +121,25 @@
 </template>
 
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from "vue";
+import { nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 
-type ChatMessage = { role: string; content: string };
+type ChatArticleCard = {
+  id: number;
+  slug: string;
+  title: string;
+  summary?: string;
+  thumbnail: string | null;
+};
+
+type ChatMessage = { role: string; content: string; relatedPosts?: ChatArticleCard[]; relatedVisibleCount?: number };
+
+type ChatResponse = {
+  answer: string;
+  memoryMode: string;
+  sessionId: string;
+  supportingArticles: ChatArticleCard[];
+  recommendedArticles: ChatArticleCard[];
+};
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, {
@@ -123,7 +164,10 @@ const messages = ref<ChatMessage[]>([]);
 const isOpen = ref(false);
 const isSending = ref(false);
 const isComposing = ref(false);
+const streamingAssistant = ref<ChatMessage | null>(null);
 const messagesContainer = ref<HTMLElement | null>(null);
+let revealTimer: ReturnType<typeof setInterval> | null = null;
+let relatedRevealTimer: ReturnType<typeof setTimeout> | ReturnType<typeof setInterval> | null = null;
 
 function isUserRole(role: string) {
   return role.toLowerCase() === "user";
@@ -137,6 +181,107 @@ async function scrollToLatestMessage() {
   await nextTick();
   if (!messagesContainer.value) return;
   messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight;
+}
+
+function stopRevealTimer() {
+  if (revealTimer) {
+    clearInterval(revealTimer);
+    revealTimer = null;
+  }
+}
+
+function stopRelatedRevealTimer() {
+  if (relatedRevealTimer) {
+    clearTimeout(relatedRevealTimer);
+    clearInterval(relatedRevealTimer);
+    relatedRevealTimer = null;
+  }
+}
+
+function collectRelatedPosts(response: Pick<ChatResponse, "supportingArticles" | "recommendedArticles">) {
+  const combined = [...response.supportingArticles, ...response.recommendedArticles];
+  const seen = new Set<string>();
+  return combined.filter((item) => {
+    const key = item.slug || String(item.id);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  }).slice(0, 3);
+}
+
+function visibleRelatedPosts(message: ChatMessage) {
+  const visibleCount = message.relatedVisibleCount ?? 0;
+  return (message.relatedPosts || []).slice(0, visibleCount);
+}
+
+async function revealAnswerWordByWord(answer: string, relatedPosts: ChatArticleCard[]) {
+  stopRevealTimer();
+  stopRelatedRevealTimer();
+  streamingAssistant.value = { role: "assistant", content: "" };
+
+  const chunks = answer.match(/\S+\s*/g) || [answer];
+  let index = 0;
+
+  await new Promise<void>((resolve) => {
+    revealTimer = setInterval(() => {
+      if (!streamingAssistant.value) {
+        stopRevealTimer();
+        resolve();
+        return;
+      }
+
+      streamingAssistant.value.content += chunks[index] || "";
+      index += 1;
+
+      if (index >= chunks.length) {
+        stopRevealTimer();
+        resolve();
+      }
+    }, 28);
+  });
+
+  const assistantMessage: ChatMessage = {
+    role: "assistant",
+    content: answer,
+    relatedPosts,
+    relatedVisibleCount: 0
+  };
+
+  messages.value.push(assistantMessage);
+  streamingAssistant.value = null;
+
+  const assistantIndex = messages.value.length - 1;
+
+  relatedRevealTimer = setTimeout(() => {
+    const currentMessage = messages.value[assistantIndex];
+    const posts = currentMessage?.relatedPosts || [];
+    if (posts.length === 0) {
+      relatedRevealTimer = null;
+      return;
+    }
+
+    messages.value[assistantIndex].relatedVisibleCount = 1;
+    scrollToLatestMessage();
+
+    const step = () => {
+      const target = messages.value[assistantIndex];
+      if (!target) {
+        stopRelatedRevealTimer();
+        return;
+      }
+
+      const currentCount = target.relatedVisibleCount || 0;
+      if (currentCount >= posts.length) {
+        stopRelatedRevealTimer();
+        return;
+      }
+
+      messages.value[assistantIndex].relatedVisibleCount = currentCount + 1;
+      scrollToLatestMessage();
+    };
+
+    relatedRevealTimer = setInterval(step, 240);
+  }, 220);
 }
 
 async function loadMemoryState() {
@@ -160,16 +305,15 @@ async function send() {
   const text = prompt.value.trim();
   if (!text || isSending.value || isComposing.value) return;
 
+  stopRevealTimer();
+  stopRelatedRevealTimer();
+  streamingAssistant.value = null;
   messages.value.push({ role: "user", content: text });
   prompt.value = "";
   isSending.value = true;
 
   try {
-    const response = await fetchJson<{
-      answer: string;
-      memoryMode: string;
-      sessionId: string;
-    }>("/api/chat/query", {
+    const response = await fetchJson<ChatResponse>("/api/chat/query", {
       method: "POST",
       body: JSON.stringify({
         message: text,
@@ -179,7 +323,7 @@ async function send() {
 
     sessionId.value = response.sessionId;
     memoryMode.value = response.memoryMode;
-    messages.value.push({ role: "assistant", content: response.answer });
+    await revealAnswerWordByWord(response.answer, collectRelatedPosts(response));
   } catch {
     messages.value.push({
       role: "assistant",
@@ -192,7 +336,16 @@ async function send() {
 
 onMounted(loadMemoryState);
 
+onBeforeUnmount(() => {
+  stopRevealTimer();
+  stopRelatedRevealTimer();
+});
+
 watch(messages, () => {
+  scrollToLatestMessage();
+}, { deep: true });
+
+watch(streamingAssistant, () => {
   scrollToLatestMessage();
 }, { deep: true });
 </script>
@@ -219,6 +372,26 @@ watch(messages, () => {
   animation: chat-bounce 1s infinite ease-in-out;
 }
 
+.related-posts-fade-enter-active,
+.related-posts-fade-leave-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.related-posts-fade-enter-from,
+.related-posts-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.related-post-card-enter-active {
+  transition: opacity 0.28s ease, transform 0.28s ease;
+}
+
+.related-post-card-enter-from {
+  opacity: 0;
+  transform: translateY(8px);
+}
+
 @keyframes chat-bounce {
   0%,
   80%,
@@ -231,4 +404,5 @@ watch(messages, () => {
     opacity: 1;
   }
 }
+
 </style>

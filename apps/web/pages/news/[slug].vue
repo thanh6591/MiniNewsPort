@@ -50,7 +50,7 @@ onMounted(() => {
       article.value = data;
       return data;
     }),
-    fetchJson<{ inCategory: News[]; global: News[] }>(`/api/news/${slug.value}/recommendations?limit=4`).then((data) => {
+        fetchJson<{ inCategory: News[]; global: News[] }>(`/api/news/similar/${slug.value}?limit=4`).then((data) => {
       recommendationResponse.value = data;
       return data;
     })

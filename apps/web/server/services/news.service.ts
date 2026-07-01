@@ -270,7 +270,34 @@ export const newsService = {
     const inCategoryIds = inCategoryCandidates.map((item) => item.articleId).slice(0, limit);
     const inCategoryArticles = await newsRepo.findPublishedByIds(inCategoryIds);
 
-    const excluded = new Set<number>([article.id, ...inCategoryIds]);
+    const inCategoryMap = new Map<number, (typeof inCategoryArticles)[number]>();
+    for (const item of inCategoryArticles) {
+      inCategoryMap.set(item.id, item);
+    }
+
+    if (inCategoryMap.size < limit) {
+      const fallback = await newsRepo.list({
+        page: 1,
+        limit: limit + 1,
+        categoryId: article.categoryId,
+        status: "PUBLISHED"
+      });
+
+      for (const item of fallback.items) {
+        if (item.id === article.id || inCategoryMap.has(item.id)) {
+          continue;
+        }
+
+        inCategoryMap.set(item.id, item);
+        if (inCategoryMap.size >= limit) {
+          break;
+        }
+      }
+    }
+
+    const resolvedInCategoryArticles = Array.from(inCategoryMap.values()).slice(0, limit);
+
+    const excluded = new Set<number>([article.id, ...resolvedInCategoryArticles.map((item) => item.id)]);
     const globalIds = globalCandidates
       .map((item) => item.articleId)
       .filter((id) => !excluded.has(id))
@@ -281,13 +308,13 @@ export const newsService = {
     const response = {
       sourceArticleId: article.id,
       categorySlug: category.slug,
-      inCategory: inCategoryArticles,
+      inCategory: resolvedInCategoryArticles,
       global: globalArticles
     };
 
     await logTelemetry("article_recommendations", {
       sourceArticleId: article.id,
-      inCategoryCount: inCategoryArticles.length,
+      inCategoryCount: resolvedInCategoryArticles.length,
       globalCount: globalArticles.length,
       latencyMs: Date.now() - startedAt
     });

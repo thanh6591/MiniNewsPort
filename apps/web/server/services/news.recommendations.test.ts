@@ -102,4 +102,56 @@ describe("newsService.similarRecommendationsBySlug", () => {
     expect(result.inCategory.map((item: any) => item.id)).toEqual([2, 3]);
     expect(result.global.map((item: any) => item.id)).toEqual([4, 5]);
   });
+
+  it("falls back to same-category articles when vector results are empty", async () => {
+    const { newsRepo } = await import("../repositories/news.repo");
+    const { categoryService } = await import("./category.service");
+    const { createEmbeddingProvider } = await import("../ai/providers");
+    const { createRetrievalServiceFromRuntimeConfig } = await import("./retrieval.service");
+
+    vi.mocked(newsRepo.findBySlug).mockResolvedValue({
+      id: 1,
+      title: "A",
+      slug: "a",
+      summary: "S",
+      content: "C",
+      imageUrl: null,
+      status: "PUBLISHED",
+      publishedAt: new Date(),
+      viewCount: 0,
+      categoryId: 10,
+      createdAt: new Date(),
+      updatedAt: new Date()
+    } as any);
+
+    vi.mocked(categoryService.getById).mockResolvedValue({ id: 10, slug: "tech" } as any);
+
+    vi.mocked(createEmbeddingProvider).mockReturnValue({
+      provider: "ollama",
+      model: "bge-m3",
+      embed: vi.fn().mockResolvedValue([[0.1, 0.2, 0.3]])
+    } as any);
+
+    vi.mocked(createRetrievalServiceFromRuntimeConfig).mockReturnValue({
+      search: vi.fn(),
+      similar: vi.fn().mockResolvedValue([]),
+      recommendForUser: vi.fn(),
+      retrieveContext: vi.fn()
+    });
+
+    vi.mocked(newsRepo.findPublishedByIds).mockResolvedValue([] as any);
+    vi.mocked(newsRepo.list).mockResolvedValue({
+      items: [
+        { id: 1, slug: "a" },
+        { id: 2, slug: "b" },
+        { id: 3, slug: "c" }
+      ]
+    } as any);
+
+    const { newsService } = await import("./news.service");
+    const result = await newsService.similarRecommendationsBySlug("a", 2);
+
+    expect(result.inCategory.map((item: any) => item.id)).toEqual([2, 3]);
+    expect(result.global).toEqual([]);
+  });
 });
