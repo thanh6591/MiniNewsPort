@@ -92,4 +92,41 @@ describe("newsService.personalizedRecommendations", () => {
     expect(result.metadata.fallback).toBe(false);
     expect(result.items).toHaveLength(2);
   });
+
+  it("falls back deterministically when retrieval raises an error", async () => {
+    const { getRecentUserViewArticleIds } = await import("../personalization/store");
+    const { newsRepo } = await import("../repositories/news.repo");
+    const { createEmbeddingProvider } = await import("../ai/providers");
+    const { createRetrievalServiceFromRuntimeConfig } = await import("./retrieval.service");
+
+    vi.mocked(getRecentUserViewArticleIds).mockResolvedValue([1, 2, 3, 4]);
+    vi.mocked(newsRepo.findPublishedByIds)
+      .mockResolvedValueOnce([
+        { id: 1, title: "A", summary: "A sum" },
+        { id: 2, title: "B", summary: "B sum" },
+        { id: 3, title: "C", summary: "C sum" }
+      ] as any)
+      .mockResolvedValueOnce([{ id: 42 }] as any);
+
+    vi.mocked(createEmbeddingProvider).mockReturnValue({
+      provider: "ollama",
+      model: "bge-m3",
+      embed: vi.fn().mockResolvedValue([[0.11, 0.22]])
+    } as any);
+
+    vi.mocked(createRetrievalServiceFromRuntimeConfig).mockReturnValue({
+      search: vi.fn(),
+      similar: vi.fn(),
+      retrieveContext: vi.fn(),
+      recommendForUser: vi.fn().mockRejectedValue(new Error("retrieval_down"))
+    });
+
+    const { newsService } = await import("./news.service");
+    vi.spyOn(newsService, "mostViewedToday").mockResolvedValue([{ newsId: 42 }] as any);
+
+    const result = await newsService.personalizedRecommendations({ userId: "admin:admin", limit: 4 });
+    expect(result.metadata.fallback).toBe(true);
+    expect(result.metadata.reason).toContain("retrieval_down");
+    expect(result.items.map((item: any) => item.id)).toEqual([42]);
+  });
 });

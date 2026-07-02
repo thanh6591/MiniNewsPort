@@ -3,7 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("../repositories/news.repo", () => ({
   newsRepo: {
     findBySlug: vi.fn(),
-    findPublishedByIds: vi.fn()
+    findPublishedByIds: vi.fn(),
+    list: vi.fn()
   }
 }));
 

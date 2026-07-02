@@ -1,0 +1,66 @@
+{
+  "capturedAtUtc": "2026-07-01T15:45:09.456591Z",
+  "engine": "qdrant",
+  "threeRequiredCutoverMetrics": {
+    "topKOverlapProxy": {
+      "definition": "Top-k ID overlap against fixed probe reference sets",
+      "baselineReferenceReady": true,
+      "baselineSelfOverlap": 1.0
+    },
+    "p95LatencyMs": {
+      "search": 157.43,
+      "similarRecommendations": 624.81
+    },
+    "errorRate": {
+      "search": 0.0,
+      "similarRecommendations": 0.0
+    }
+  },
+  "referenceProbes": {
+    "semanticSearch": [
+      {
+        "query": "world cup",
+        "topArticleIds": [
+          558,
+          562,
+          561,
+          560,
+          556
+        ]
+      },
+      {
+        "query": "lamine yamal",
+        "topArticleIds": [
+          556,
+          561,
+          562,
+          560,
+          557
+        ]
+      },
+      {
+        "query": "iran",
+        "topArticleIds": [
+          559,
+          556,
+          557,
+          560,
+          561
+        ]
+      }
+    ],
+    "similarRecommendations": {
+      "slug": "nhat-ban-thang-am-tunisia-o-tran-thu-1000-cua-world-cup-bao-vnexpress-3",
+      "inCategoryIds": [
+        561,
+        560,
+        557,
+        558
+      ],
+      "globalIds": [
+        559,
+        556
+      ]
+    }
+  }
+}

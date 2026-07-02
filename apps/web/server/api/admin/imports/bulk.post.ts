@@ -6,7 +6,7 @@ export default defineEventHandler(async (event) => {
   try {
     await requireAdmin(event);
     const { body } = await validate(event, { body: bulkImportSubmitSchema });
-    const parsed = body as { urls: string[]; categoryId: number };
+    const parsed = body as { urls: string[]; categoryId: number; autoCategory?: boolean };
     const result = await importService.submitBulk(parsed);
     setResponseStatus(event, 202);
     return result;

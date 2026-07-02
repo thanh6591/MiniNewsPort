@@ -6,7 +6,7 @@ import { logVectorDlq } from "../vector/dlq";
 import { getQueueAdapter } from "../queue";
 import { QUEUE_NAMES, SCRAPING_RETRY, type ScrapeJobData } from "../queue/types";
 import { HttpFetchError, SelectorMismatchError } from "./errors";
-import { extractFromHtml, fetchHtml, slugify } from "./scraper";
+import { extractFromHtml, fetchHtml, inferCategoryFromUrl, slugify } from "./scraper";
 
 class DomainSemaphore {
   private inFlight = new Map<string, number>();
@@ -55,6 +55,37 @@ async function uniqueSlug(base: string): Promise<string> {
   return candidate;
 }
 
+async function resolveCategoryIdForImport(data: ScrapeJobData) {
+  if (!data.autoCategory) {
+    return data.categoryId;
+  }
+
+  const inferred = inferCategoryFromUrl(data.sourceUrl);
+  if (!inferred) {
+    return data.categoryId;
+  }
+
+  const existing = await categoryRepo.findBySlug(inferred.slug);
+  if (existing) {
+    return existing.id;
+  }
+
+  try {
+    const created = await categoryRepo.create({
+      name: inferred.name,
+      slug: inferred.slug
+    });
+    return created.id;
+  } catch {
+    // Handle concurrent creation race by reading again.
+    const retry = await categoryRepo.findBySlug(inferred.slug);
+    if (retry) {
+      return retry.id;
+    }
+    return data.categoryId;
+  }
+}
+
 export async function startScrapingWorker(opts: { concurrency?: number } = {}) {
   const maxPerDomain = Math.max(1, Number(process.env.SCRAPE_MAX_PER_DOMAIN ?? "2"));
   const userAgent = String(process.env.SCRAPE_USER_AGENT ?? "MiniNewsPortalBot/1.0");
@@ -76,6 +107,7 @@ export async function startScrapingWorker(opts: { concurrency?: number } = {}) {
 
       const html = await fetchHtml(data.sourceUrl, userAgent);
       const extracted = extractFromHtml(html);
+      const resolvedCategoryId = await resolveCategoryIdForImport(data);
 
       const slug = await uniqueSlug(slugify(extracted.title));
       const created = await newsRepo.create({
@@ -86,7 +118,7 @@ export async function startScrapingWorker(opts: { concurrency?: number } = {}) {
         imageUrl: extracted.imageUrl,
         status: "PUBLISHED",
         publishedAt: new Date(),
-        categoryId: data.categoryId
+        categoryId: resolvedCategoryId
       });
 
       if (!created) {
@@ -96,7 +128,7 @@ export async function startScrapingWorker(opts: { concurrency?: number } = {}) {
 
       // Index embedding (best-effort) so imported articles are searchable via vector search.
       try {
-        const category = await categoryRepo.findById(data.categoryId);
+        const category = await categoryRepo.findById(resolvedCategoryId);
         await upsertArticleEmbedding({
           id: created.id,
           title: created.title,

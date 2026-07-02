@@ -10,7 +10,8 @@
     "typecheck": "pnpm -r --if-present run typecheck",
     "test": "pnpm -r --if-present run test",
     "test:e2e": "pnpm --dir e2e/playwright test",
-    "infra:up": "docker rm -f mini-news-portal-db mini-news-portal-qdrant mini-news-portal-redis mini-news-portal-mailpit >/dev/null 2>&1 || true; docker compose up -d --force-recreate --remove-orphans postgres qdrant redis",
+    "infra:up": "docker rm -f mini-news-portal-db mini-news-portal-qdrant mini-news-portal-redis mini-news-portal-mailpit >/dev/null 2>&1 || true; docker compose up -d --force-recreate --remove-orphans postgres redis",
+    "infra:up:rollback": "docker rm -f mini-news-portal-db mini-news-portal-qdrant mini-news-portal-redis mini-news-portal-mailpit >/dev/null 2>&1 || true; docker compose --profile rollback up -d --force-recreate --remove-orphans postgres qdrant redis",
     "infra:down": "docker compose down --remove-orphans; docker rm -f mini-news-portal-db mini-news-portal-qdrant mini-news-portal-redis mini-news-portal-mailpit >/dev/null 2>&1 || true",
     "ai:models:pull": "ollama pull bge-m3 && ollama pull qwen2.5:7b-instruct && ollama pull qwen2.5:3b-instruct",
     "worker:up": "REDIS_URL=redis://127.0.0.1:6379 pnpm --dir apps/web worker",
@@ -21,7 +22,11 @@
     "db:migrate": "pnpm --dir apps/web db:migrate",
     "db:seed": "pnpm --dir apps/web db:seed",
     "db:studio": "cd apps/web && pnpm drizzle-kit studio",
-    "stack:up": "pnpm infra:down && pnpm infra:up && pnpm db:migrate && (pnpm dev & pnpm worker:up & wait)"
+    "vector:bench": "node scripts/vector-bench.mjs",
+    "vector:shadow-report": "node scripts/vector-shadow-report.mjs",
+    "vector:audit-close": "node scripts/vector-audit-close.mjs",
+    "stack:up": "pnpm infra:down && pnpm infra:up && pnpm db:migrate && (pnpm dev & pnpm worker:up & wait)",
+    "stack:up:rollback": "pnpm infra:down && pnpm infra:up:rollback && pnpm db:migrate && (pnpm dev & pnpm worker:up & wait)"
   },
   "devDependencies": {
     "@types/node": "^22.15.21",

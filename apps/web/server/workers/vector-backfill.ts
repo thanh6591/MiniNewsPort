@@ -66,6 +66,11 @@ async function run() {
   let lastSeenId = 0;
   let indexed = 0;
   let failed = 0;
+  let skipped = 0;
+  let wrotePgvector = 0;
+  let wroteQdrant = 0;
+  let dualWriteAligned = 0;
+  let dualWriteDrift = 0;
 
   console.info(`[vector-backfill] start batchSize=${batchSize} retries=${retries}`);
 
@@ -77,7 +82,7 @@ async function run() {
 
     for (const row of rows) {
       try {
-        await withRetry(
+        const result = await withRetry(
           () =>
             upsertArticleEmbedding(
               {
@@ -93,6 +98,27 @@ async function run() {
           retries,
           retryDelayMs
         );
+
+        if (result.skipped) {
+          skipped += 1;
+        } else {
+          if (result.wrotePgvector) {
+            wrotePgvector += 1;
+          }
+
+          if (result.wroteQdrant) {
+            wroteQdrant += 1;
+          }
+
+          if (settings.vectorDualWrite) {
+            if (result.wrotePgvector && result.wroteQdrant) {
+              dualWriteAligned += 1;
+            } else {
+              dualWriteDrift += 1;
+            }
+          }
+        }
+
         indexed += 1;
       } catch (error) {
         failed += 1;
@@ -110,10 +136,16 @@ async function run() {
       lastSeenId = row.id;
     }
 
-    console.info(`[vector-backfill] progress indexed=${indexed} failed=${failed} lastSeenId=${lastSeenId}`);
+    console.info(
+      `[vector-backfill] progress indexed=${indexed} failed=${failed} skipped=${skipped} lastSeenId=${lastSeenId} ` +
+        `coverage(pgvector=${wrotePgvector},qdrant=${wroteQdrant}) parity(aligned=${dualWriteAligned},drift=${dualWriteDrift})`
+    );
   }
 
-  console.info(`[vector-backfill] done indexed=${indexed} failed=${failed}`);
+  console.info(
+    `[vector-backfill] done indexed=${indexed} failed=${failed} skipped=${skipped} ` +
+      `coverage(pgvector=${wrotePgvector},qdrant=${wroteQdrant}) parity(aligned=${dualWriteAligned},drift=${dualWriteDrift})`
+  );
 }
 
 run()

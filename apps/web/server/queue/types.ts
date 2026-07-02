@@ -37,6 +37,7 @@ export type ScrapeJobData = {
   importItemId: number;
   batchId: number;
   categoryId: number;
+  autoCategory: boolean;
   sourceUrl: string;
   sourceDomain: string;
 };

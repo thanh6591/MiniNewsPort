@@ -107,6 +107,19 @@ export const newsRepo = {
     return rows[0] ?? null;
   },
 
+  async findByIds(ids: number[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const idList = ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    if (idList.length === 0) {
+      return [];
+    }
+
+    return db.select().from(news).where(inArray(news.id, idList));
+  },
+
   async findPublishedByIds(ids: number[]) {
     if (ids.length === 0) {
       return [];
@@ -255,6 +268,36 @@ export const newsRepo = {
   async delete(id: number) {
     const rows = await db.delete(news).where(eq(news.id, id)).returning({ id: news.id });
     return rows.length > 0;
+  },
+
+  async deleteMany(ids: number[]) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const idList = ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    if (idList.length === 0) {
+      return [];
+    }
+
+    return db.delete(news).where(inArray(news.id, idList)).returning({ id: news.id });
+  },
+
+  async updateCategoryMany(ids: number[], categoryId: number) {
+    if (ids.length === 0) {
+      return [];
+    }
+
+    const idList = ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0);
+    if (idList.length === 0) {
+      return [];
+    }
+
+    return db
+      .update(news)
+      .set({ categoryId, updatedAt: new Date() })
+      .where(inArray(news.id, idList))
+      .returning();
   },
 
   async incrementViewCount(id: number) {

@@ -1,4 +1,5 @@
 import {
+  customType,
   date,
   index,
   integer,
@@ -10,6 +11,15 @@ import {
   uniqueIndex,
   varchar
 } from "drizzle-orm/pg-core";
+
+const vector = customType<{ data: number[]; dimensions: number }>({
+  dataType(config) {
+    return `vector(${config.dimensions})`;
+  },
+  toDriver(value) {
+    return `[${value.map((entry) => Number(entry)).join(",")}]`;
+  }
+});
 
 export const newsStatusEnum = pgEnum("news_status", ["DRAFT", "PUBLISHED"]);
 export const importItemStatusEnum = pgEnum("import_item_status", [
@@ -105,5 +115,25 @@ export const importItems = pgTable(
   (table) => ({
     batchIdx: index("idx_import_items_batch").on(table.batchId),
     batchStatusIdx: index("idx_import_items_batch_status").on(table.batchId, table.status)
+  })
+);
+
+export const articleEmbeddings = pgTable(
+  "article_embeddings",
+  {
+    articleId: integer("article_id").primaryKey(),
+    indexVersion: integer("index_version").notNull().default(1),
+    categorySlug: varchar("category_slug", { length: 120 }).notNull(),
+    publishedAt: timestamp("published_at", { withTimezone: true }),
+    source: varchar("source", { length: 64 }).notNull().default("internal"),
+    language: varchar("language", { length: 12 }).notNull().default("vi"),
+    embedding: vector("embedding", { dimensions: 1024 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull()
+  },
+  (table) => ({
+    categorySlugIdx: index("idx_article_embeddings_category_slug").on(table.categorySlug),
+    publishedAtIdx: index("idx_article_embeddings_published_at").on(table.publishedAt),
+    indexVersionIdx: index("idx_article_embeddings_index_version").on(table.indexVersion)
   })
 );

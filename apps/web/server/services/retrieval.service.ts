@@ -1,6 +1,8 @@
-import { getQdrantRuntimeSettings, qdrantRequest, ARTICLE_PAYLOAD_FIELDS, type QdrantRuntimeSettings } from "~/server/vector/qdrant";
-import { getAiRuntimeSettings, type AiRuntimeSettings } from "~/server/ai/runtime";
-import { rerankCandidates } from "~/server/ai/reranker";
+import { getQdrantRuntimeSettings, qdrantRequest, ARTICLE_PAYLOAD_FIELDS, type QdrantRuntimeSettings } from "../vector/qdrant";
+import { getAiRuntimeSettings, type AiRuntimeSettings } from "../ai/runtime";
+import { articleEmbeddingsRepo } from "../repositories/article-embeddings.repo";
+import { rerankCandidates } from "../ai/reranker";
+import { logTelemetry } from "../utils/telemetry";
 
 export type RetrievalCandidate = {
   articleId: number;
@@ -51,6 +53,8 @@ export interface RetrievalService {
   recommendForUser(input: PersonalizedRecommendationsInput): Promise<RetrievalCandidate[]>;
   retrieveContext(input: RetrievalContextInput): Promise<RetrievalCandidate[]>;
 }
+
+type RetrievalOperation = "search" | "similar" | "recommendForUser" | "retrieveContext";
 
 type QdrantPoint = {
   score?: number;
@@ -236,8 +240,188 @@ export class QdrantRetrievalService implements RetrievalService {
   }
 }
 
+export class PGVectorRetrievalService implements RetrievalService {
+  constructor(private readonly aiSettings?: AiRuntimeSettings) {}
+
+  private async maybeRerank(results: RetrievalCandidate[], queryText?: string) {
+    if (!this.aiSettings || !queryText || !this.aiSettings.rerankerEnabled) {
+      return results;
+    }
+
+    return rerankCandidates(queryText, results, this.aiSettings);
+  }
+
+  async search(input: SemanticSearchInput) {
+    const candidates = await articleEmbeddingsRepo.topKSimilar({
+      queryVector: input.queryVector,
+      limit: input.limit,
+      categorySlug: input.category
+    });
+
+    const mapped = candidates.map((item) => ({
+      articleId: item.articleId,
+      score: item.score,
+      category: item.categorySlug,
+      source: item.source,
+      language: item.language,
+      publishedAt: item.publishedAt ?? undefined,
+      indexVersion: item.indexVersion
+    }));
+
+    return this.maybeRerank(mapped, input.queryText);
+  }
+
+  async similar(input: SimilarArticlesInput) {
+    const candidates = await articleEmbeddingsRepo.topKSimilar({
+      queryVector: input.articleVector,
+      limit: input.limit,
+      categorySlug: input.category,
+      excludeArticleIds: input.excludeArticleIds
+    });
+
+    const mapped = candidates.map((item) => ({
+      articleId: item.articleId,
+      score: item.score,
+      category: item.categorySlug,
+      source: item.source,
+      language: item.language,
+      publishedAt: item.publishedAt ?? undefined,
+      indexVersion: item.indexVersion
+    }));
+
+    return this.maybeRerank(mapped, input.queryText);
+  }
+
+  async recommendForUser(input: PersonalizedRecommendationsInput) {
+    const candidates = await articleEmbeddingsRepo.topKSimilar({
+      queryVector: input.userVector,
+      limit: input.limit,
+      categorySlugs: input.categories,
+      excludeArticleIds: input.excludeArticleIds
+    });
+
+    const mapped = candidates.map((item) => ({
+      articleId: item.articleId,
+      score: item.score,
+      category: item.categorySlug,
+      source: item.source,
+      language: item.language,
+      publishedAt: item.publishedAt ?? undefined,
+      indexVersion: item.indexVersion
+    }));
+
+    return this.maybeRerank(mapped, input.queryText);
+  }
+
+  async retrieveContext(input: RetrievalContextInput) {
+    return this.similar({
+      articleVector: input.queryVector,
+      queryText: input.queryText,
+      limit: input.limit,
+      category: input.category,
+      excludeArticleIds: input.excludeArticleIds
+    });
+  }
+}
+
+function toFlag(value: string | undefined, fallback: boolean) {
+  if (value === undefined || value === "") return fallback;
+  const normalized = value.trim().toLowerCase();
+  return normalized === "1" || normalized === "true" || normalized === "yes";
+}
+
+function getOverlapAtK(primary: RetrievalCandidate[], shadow: RetrievalCandidate[]) {
+  const k = Math.max(1, Math.min(primary.length, shadow.length));
+  if (k === 0) {
+    return 1;
+  }
+
+  const primaryIds = new Set(primary.slice(0, k).map((item) => item.articleId));
+  const shadowIds = new Set(shadow.slice(0, k).map((item) => item.articleId));
+  let overlap = 0;
+
+  for (const id of primaryIds) {
+    if (shadowIds.has(id)) {
+      overlap += 1;
+    }
+  }
+
+  return overlap / k;
+}
+
+class ShadowReadRetrievalService implements RetrievalService {
+  constructor(
+    private readonly primaryEngine: "qdrant" | "pgvector",
+    private readonly primary: RetrievalService,
+    private readonly shadow: RetrievalService,
+    private readonly enabled: boolean
+  ) {}
+
+  private async runWithShadow<TInput>(operation: RetrievalOperation, input: TInput) {
+    const startedPrimary = Date.now();
+    const primaryResult = await this.primary[operation](input as any);
+    const primaryLatencyMs = Date.now() - startedPrimary;
+
+    if (!this.enabled) {
+      return primaryResult;
+    }
+
+    const startedShadow = Date.now();
+    let shadowResult: RetrievalCandidate[] = [];
+    let shadowError: string | undefined;
+
+    try {
+      shadowResult = await this.shadow[operation](input as any);
+    } catch (error) {
+      shadowError = error instanceof Error ? error.message : "shadow read failed";
+    }
+
+    const shadowLatencyMs = Date.now() - startedShadow;
+    const overlapAtK = shadowError ? 0 : getOverlapAtK(primaryResult, shadowResult);
+
+    await logTelemetry("vector_shadow_read", {
+      operation,
+      primaryEngine: this.primaryEngine,
+      shadowEngine: this.primaryEngine === "qdrant" ? "pgvector" : "qdrant",
+      primaryLatencyMs,
+      shadowLatencyMs,
+      primaryResultCount: primaryResult.length,
+      shadowResultCount: shadowResult.length,
+      overlapAtK,
+      shadowError
+    });
+
+    return primaryResult;
+  }
+
+  search(input: SemanticSearchInput) {
+    return this.runWithShadow("search", input);
+  }
+
+  similar(input: SimilarArticlesInput) {
+    return this.runWithShadow("similar", input);
+  }
+
+  recommendForUser(input: PersonalizedRecommendationsInput) {
+    return this.runWithShadow("recommendForUser", input);
+  }
+
+  retrieveContext(input: RetrievalContextInput) {
+    return this.runWithShadow("retrieveContext", input);
+  }
+}
+
 export function createRetrievalServiceFromRuntimeConfig(config: ReturnType<typeof useRuntimeConfig>): RetrievalService {
-  const settings = getQdrantRuntimeSettings(config);
   const aiSettings = getAiRuntimeSettings(config);
-  return new QdrantRetrievalService(settings, aiSettings);
+  const engine = config.vectorEngine === "pgvector" ? "pgvector" : "qdrant";
+  const shadowReadEnabled = toFlag(config.vectorShadowRead as string | undefined, false);
+
+  const qdrantService = new QdrantRetrievalService(getQdrantRuntimeSettings(config), aiSettings);
+  const pgvectorService = new PGVectorRetrievalService(aiSettings);
+
+  if (engine === "pgvector") {
+    return new ShadowReadRetrievalService(engine, pgvectorService, qdrantService, shadowReadEnabled);
+  }
+
+  return new ShadowReadRetrievalService(engine, qdrantService, pgvectorService, shadowReadEnabled);
 }

@@ -100,11 +100,48 @@ describe("importService.submitBulk", () => {
     expect(result.acceptedCount).toBe(1);
     expect(result.skippedCount).toBe(2);
     expect(publish).toHaveBeenCalledTimes(1);
-    expect(publish).toHaveBeenCalledWith(
-      "news-scraping-queue",
-      expect.objectContaining({ importItemId: 100, batchId: 7, categoryId: 1 })
-    );
+      expect(publish).toHaveBeenCalledWith(
+        "news-scraping-queue",
+        expect.objectContaining({ importItemId: 100, batchId: 7, categoryId: 1, autoCategory: true })
+      );
   });
+
+    it("passes autoCategory=false to worker payload when toggle is off", async () => {
+      mockCategoryFound(1);
+      vi.mocked(importRepo.createBatch).mockResolvedValue({
+        batch: { id: 9, categoryId: 1, totalCount: 1, createdAt: new Date(), updatedAt: new Date() } as never,
+        items: [
+          {
+            id: 101,
+            batchId: 9,
+            sourceUrl: "https://e.com/a",
+            sourceDomain: "e.com",
+            status: "PENDING",
+            attempts: 0,
+            failureReason: null,
+            newsId: null,
+            startedAt: null,
+            completedAt: null,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          } as never
+        ]
+      });
+
+      const publish = vi.fn().mockResolvedValue("job-id");
+      vi.mocked(getQueueAdapter).mockResolvedValue({ publish, kind: "in-process" } as never);
+
+      await importService.submitBulk({
+        urls: ["https://e.com/a"],
+        categoryId: 1,
+        autoCategory: false
+      });
+
+      expect(publish).toHaveBeenCalledWith(
+        "news-scraping-queue",
+        expect.objectContaining({ autoCategory: false, categoryId: 1 })
+      );
+    });
 
   it("throws ValidationError when no valid URLs remain", async () => {
     mockCategoryFound(1);

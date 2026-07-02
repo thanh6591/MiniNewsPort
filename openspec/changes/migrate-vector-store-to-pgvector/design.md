@@ -14,6 +14,7 @@ At the same time, core entities (`news`, categories, view events) already live i
 - Keep existing API and UI contracts unchanged for semantic search, recommendations, personalization, and chatbot grounding.
 - Reduce operational surface area by eliminating required Qdrant service in local/prod baseline.
 - Achieve quality and latency parity (or better) before full cutover.
+- Execute a safe cutover with constrained scope first, then defer non-critical optimization/cleanup.
 
 **Non-Goals**
 - Rewriting ranking policy from scratch.
@@ -48,11 +49,21 @@ At the same time, core entities (`news`, categories, view events) already live i
 - Keep async indexing/backfill workers and retry/DLQ behavior.
 
 5. Migration strategy
-- Phase A: dual-write (Qdrant + pgvector) for new/updated embeddings.
-- Phase B: shadow-read comparisons (quality and latency telemetry only).
-- Phase C: switch read path to pgvector under feature flag.
-- Phase D: disable Qdrant write path.
-- Phase E: remove Qdrant infra/config/docs after stability window.
+- Phase 1 - Must-Have Safe Cutover: dual-write + shadow-read window (3-5 days) + read cutover with rollback guardrail.
+- Phase 2 - Post-Stability Cleanup and Hardening: remove Qdrant dependency and run optional index/performance tuning.
+
+6. Go/No-Go criteria and telemetry scope
+- Use only the three required cutover metrics for read-cutover decisions:
+  - top-k overlap proxy between Qdrant and pgvector,
+  - p95 latency,
+  - error rate.
+- Timebox the shadow-read window to 3-5 days to avoid indefinite migration drag.
+- Rationale: keeps migration decision objective while constraining scope.
+
+7. Cutover safety posture
+- Keep rollback path active at read-engine switch time.
+- Delay infrastructure deletion (Qdrant removal) until the stability window completes.
+- Rationale: separates reversible feature cutover from irreversible cleanup.
 
 ## Architecture Sketch
 
@@ -84,9 +95,22 @@ Embedding Provider -> PGVector Indexer (SQL) -> Postgres (article_embeddings)
 ## Validation Plan
 
 - Functional parity tests for all retrieval entry points.
-- Relevance sanity checks over representative query set.
-- Performance checks (p50/p95 latency) under expected local/prod-like load.
+- Timeboxed shadow-read report (3-5 days) using top-k overlap proxy, p95 latency, and error rate.
+- Go/no-go decision log based on predeclared thresholds for the three required cutover metrics.
 - Rollback drill: switch read engine flag back to Qdrant without data loss.
+
+## Phase Breakdown
+
+### Phase 1 - Must-Have Safe Cutover
+- Enable pgvector schema/indexing path.
+- Run dual-write for embedding lifecycle.
+- Run shadow-read comparisons under timebox.
+- Cut over read engine behind flag with rollback guardrail still active.
+
+### Phase 2 - Post-Stability Cleanup and Hardening
+- Remove Qdrant infra/config/runtime dependencies after stability window.
+- Run optional index-strategy and query tuning only if metrics warrant.
+- Finalize migration audit and close residual technical debt.
 
 ## Open Questions
 

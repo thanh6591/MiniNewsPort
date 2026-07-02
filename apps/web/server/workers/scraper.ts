@@ -21,6 +21,11 @@ export type ScrapeResult = {
   imageUrl: string | null;
 };
 
+export type InferredCategory = {
+  slug: string;
+  name: string;
+};
+
 const SANITIZE_OPTIONS: sanitizeHtml.IOptions = {
   allowedTags: [
     "p", "br", "strong", "em", "u", "i", "b",
@@ -126,4 +131,66 @@ export function slugify(input: string): string {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 200) || "article";
+}
+
+function toCategoryName(slug: string) {
+  return slug
+    .split("-")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+    .slice(0, 100);
+}
+
+export function inferCategoryFromUrl(rawUrl: string): InferredCategory | null {
+  let parsed: URL;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    return null;
+  }
+
+  const ignore = new Set(["", "p", "amp", "rss", "video", "videos", "news", "article", "thread", "threads"]);
+  const segments = parsed.pathname
+    .split("/")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+
+  for (const segment of segments) {
+    const plain = decodeURIComponent(segment)
+      .replace(/\.html?$/i, "")
+      .replace(/\.\d+$/g, "")
+      .trim();
+
+    // Skip article-style slugs (often long and ending with numeric IDs),
+    // otherwise we may accidentally create categories from article titles.
+    if (/[-_]\d{4,}$/.test(plain)) {
+      continue;
+    }
+    if (ignore.has(plain.toLowerCase())) {
+      continue;
+    }
+    if (/^\d{4}$/.test(plain)) {
+      continue;
+    }
+
+    const slug = slugify(plain);
+    if (!slug || /^\d+$/.test(slug)) {
+      continue;
+    }
+
+    const parts = slug.split("-").filter(Boolean);
+    if (slug.length > 40 || parts.length > 4) {
+      continue;
+    }
+
+    const name = toCategoryName(slug);
+    if (!name) {
+      continue;
+    }
+
+    return { slug, name };
+  }
+
+  return null;
 }

@@ -38,6 +38,22 @@
           </select>
         </div>
 
+        <div class="rounded border border-slate-200 bg-slate-50 p-3">
+          <label class="flex items-start gap-3 text-sm text-slate-700">
+            <input
+              v-model="autoCategory"
+              type="checkbox"
+              class="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            />
+            <span>
+              <span class="font-medium">Auto category by article URL</span>
+              <span class="mt-1 block text-xs text-slate-500">
+                On: infer/create category from each article URL path. Off: always use selected category above.
+              </span>
+            </span>
+          </label>
+        </div>
+
         <div v-if="errorMessage" class="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-700">
           {{ errorMessage }}
         </div>
@@ -68,6 +84,7 @@ const categoriesStore = useCategoriesStore();
 // ─── Manual URL import state ────────────────────────────
 const urlsText = ref("");
 const categoryId = ref<number | null>(null);
+const autoCategory = ref(true);
 const submitting = ref(false);
 const errorMessage = ref<string | null>(null);
 
@@ -107,7 +124,7 @@ async function onSubmit() {
       "/api/admin/imports/bulk",
       {
         method: "POST",
-        body: { urls: urlsText.value, categoryId: categoryId.value }
+        body: { urls: urlsText.value, categoryId: categoryId.value, autoCategory: autoCategory.value }
       }
     );
     router.push(`/admin/imports/${response.batchId}`);

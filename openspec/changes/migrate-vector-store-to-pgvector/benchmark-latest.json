@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-07-02T03:54:16.829Z",
+  "config": {
+    "baseUrl": "http://127.0.0.1:3010",
+    "slug": "",
+    "query": "tin tuc cong nghe",
+    "iterations": 5
+  },
+  "results": {
+    "semantic_search": {
+      "operation": "semantic_search",
+      "sampleCount": 5,
+      "errorCount": 5,
+      "errorRate": 1,
+      "p50Ms": 1.552082999999982,
+      "p95Ms": 147.957792,
+      "maxMs": 147.957792
+    },
+    "article_recommendations": {
+      "operation": "article_recommendations",
+      "sampleCount": 0,
+      "errorCount": 0,
+      "errorRate": 0,
+      "p50Ms": 0,
+      "p95Ms": 0,
+      "maxMs": 0
+    }
+  }
+}

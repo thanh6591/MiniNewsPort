@@ -56,6 +56,17 @@ export const newsUpdateSchema = z.object({
   categoryId: z.number().int().positive().optional()
 });
 
+export const newsBulkDeleteSchema = z.object({
+  ids: z
+    .array(z.number().int().positive("Each id must be a positive integer"))
+    .min(1, "Select at least one article")
+    .max(200, "Maximum 200 articles per bulk operation")
+});
+
+export const newsBulkCategorySchema = newsBulkDeleteSchema.extend({
+  categoryId: z.number().int().positive("Category ID must be a positive number")
+});
+
 export const newsSchema = newsCreateSchema.extend({
   id: z.number(),
   viewCount: z.number(),
@@ -131,6 +142,8 @@ export const bulkImportSubmitSchema = z.object({
         .max(100, "Maximum 100 URLs per submission")
     ),
   categoryId: z.number().int().positive("categoryId must be a positive integer")
+  ,
+  autoCategory: z.boolean().optional().default(true)
 });
 
 export const bulkImportSubmitResponseSchema = z.object({
@@ -178,6 +191,8 @@ export type CategoryWithNewsCount = z.infer<typeof categoryWithNewsCountSchema>;
 export type NewsStatus = z.infer<typeof newsStatusSchema>;
 export type NewsCreate = z.infer<typeof newsCreateSchema>;
 export type NewsUpdate = z.infer<typeof newsUpdateSchema>;
+export type NewsBulkDelete = z.infer<typeof newsBulkDeleteSchema>;
+export type NewsBulkCategory = z.infer<typeof newsBulkCategorySchema>;
 export type News = z.infer<typeof newsSchema>;
 export type NewsDetail = z.infer<typeof newsDetailSchema>;
 

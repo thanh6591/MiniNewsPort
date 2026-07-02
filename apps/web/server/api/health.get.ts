@@ -52,6 +52,37 @@ async function checkMigrationState(databaseUrl: string) {
   };
 }
 
+async function checkPgvectorReadiness(databaseUrl: string) {
+  if (isSqliteUrl(databaseUrl)) {
+    return {
+      ok: false,
+      skipped: true,
+      reason: "pgvector not available on sqlite runtime"
+    };
+  }
+
+  const extension = await db.execute<{ installed: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1 FROM pg_extension WHERE extname = 'vector'
+    ) AS installed
+  `);
+
+  const table = await db.execute<{ ready: boolean }>(sql`
+    SELECT EXISTS (
+      SELECT 1
+      FROM information_schema.tables
+      WHERE table_schema = 'public'
+        AND table_name = 'article_embeddings'
+    ) AS ready
+  `);
+
+  return {
+    ok: Boolean(extension.rows[0]?.installed) && Boolean(table.rows[0]?.ready),
+    extensionInstalled: Boolean(extension.rows[0]?.installed),
+    tableReady: Boolean(table.rows[0]?.ready)
+  };
+}
+
 export default defineEventHandler(async (event) => {
   const config = useRuntimeConfig(event);
   const databaseUrl = process.env.DATABASE_URL ?? "";
@@ -83,6 +114,26 @@ export default defineEventHandler(async (event) => {
     }
   } else {
     checks.migrations = {
+      ok: false,
+      error: "Skipped because database check failed"
+    };
+  }
+
+  if (checks.database?.ok) {
+    try {
+      checks.pgvector = await checkPgvectorReadiness(databaseUrl);
+      if (!(checks.pgvector.ok || checks.pgvector.skipped)) {
+        healthy = false;
+      }
+    } catch (error: any) {
+      healthy = false;
+      checks.pgvector = {
+        ok: false,
+        error: error?.message ?? "pgvector readiness check failed"
+      };
+    }
+  } else {
+    checks.pgvector = {
       ok: false,
       error: "Skipped because database check failed"
     };

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { extractFromHtml, slugify } from "./scraper";
+import { extractFromHtml, inferCategoryFromUrl, slugify } from "./scraper";
 import { SelectorMismatchError } from "./errors";
 
 describe("scraper.extractFromHtml", () => {
@@ -32,5 +32,37 @@ describe("scraper.slugify", () => {
   });
   it("handles diacritics", () => {
     expect(slugify("Café déjà vu")).toBe("cafe-deja-vu");
+  });
+});
+
+describe("scraper.inferCategoryFromUrl", () => {
+  it("infers first meaningful path segment", () => {
+    expect(inferCategoryFromUrl("https://vnexpress.net/kinh-doanh/chung-khoan-123.html")).toEqual({
+      slug: "kinh-doanh",
+      name: "Kinh Doanh"
+    });
+  });
+
+  it("skips generic segments like thread and infers next one", () => {
+    expect(inferCategoryFromUrl("https://tinhte.vn/thread/cong-nghe-moi.12345/")).toEqual({
+      slug: "cong-nghe-moi",
+      name: "Cong Nghe Moi"
+    });
+  });
+
+  it("returns null for invalid url", () => {
+    expect(inferCategoryFromUrl("not-a-url")).toBeNull();
+  });
+
+  it("does not infer category from article-style slug with trailing id", () => {
+    expect(
+      inferCategoryFromUrl("https://vnexpress.net/cdv-world-cup-ngu-trong-xe-cam-trai-vi-gia-khach-san-dat-do-5092300.html")
+    ).toBeNull();
+  });
+
+  it("does not infer category from overly long path segment", () => {
+    expect(
+      inferCategoryFromUrl("https://example.com/this-is-a-very-long-article-title-segment-that-should-not-be-a-category")
+    ).toBeNull();
   });
 });

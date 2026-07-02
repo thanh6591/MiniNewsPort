@@ -3,6 +3,10 @@
 ## Feature Flags
 Use runtime env flags to control release scope:
 
+- `VECTOR_ENGINE` (`pgvector` | `qdrant`)
+- `VECTOR_DUAL_WRITE` (`0` | `1`)
+- `VECTOR_SHADOW_READ` (`0` | `1`)
+
 - `FEATURE_SEMANTIC_SEARCH`
 - `FEATURE_RECOMMENDATIONS`
 - `FEATURE_PERSONALIZATION`
@@ -15,12 +19,10 @@ Values: `1|true|yes` to enable, otherwise disabled.
 
 ## Rollout Sequence
 
-1. Deploy with all new flags disabled in production.
-2. Enable semantic search only (`FEATURE_SEMANTIC_SEARCH=1`) and observe telemetry.
-3. Enable recommendations (`FEATURE_RECOMMENDATIONS=1`).
-4. Enable personalization (`FEATURE_PERSONALIZATION=1`) for admin users.
-5. Enable chatbot (`FEATURE_CHATBOT=1`) with session memory only.
-6. Enable persistent and agent memory tiers gradually.
+1. Deploy with `VECTOR_ENGINE=pgvector`, `VECTOR_DUAL_WRITE=1`, `VECTOR_SHADOW_READ=1`.
+2. Confirm `/api/health` reports `checks.pgvector.ok=true`.
+3. Observe `vector_shadow_read` telemetry for overlap/latency trends.
+4. Keep feature rollout sequence for semantic/recommendation/personalization/chatbot.
 
 ## Telemetry Checks
 
@@ -32,6 +34,7 @@ Monitor:
 - `article_recommendations` latency and result counts
 - `personalized_recommendations` fallback ratio
 - `chat_query` latency and follow-up generation counts
+- `vector_shadow_read` overlapAtK, primaryLatencyMs, shadowLatencyMs, shadowError
 
 ## Rollback Procedure
 
@@ -39,7 +42,11 @@ Monitor:
 2. Redeploy or reload runtime config.
 3. Verify API returns `503 ... disabled` for disabled capability.
 4. Keep the rest of the stack running if unrelated.
-5. For severe retrieval issues, also disable chatbot and personalization.
+5. For vector incidents:
+	- switch to `VECTOR_ENGINE=qdrant`
+	- keep `VECTOR_DUAL_WRITE=1`
+	- run `pnpm infra:up:rollback` when qdrant service is not running.
+6. For severe retrieval issues, also disable chatbot and personalization.
 
 ## Data Safety
 

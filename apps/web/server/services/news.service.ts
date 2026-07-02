@@ -582,5 +582,98 @@ export const newsService = {
     }
 
     return true;
+  },
+
+  async bulkDelete(ids: number[]) {
+    const normalizedIds = Array.from(new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
+    if (normalizedIds.length === 0) {
+      throw new ValidationError("Validation failed", [
+        {
+          field: "body.ids",
+          message: "ids must include at least one positive integer"
+        }
+      ]);
+    }
+
+    const existing = await newsRepo.findByIds(normalizedIds);
+    const existingIds = new Set(existing.map((item) => item.id));
+    const missingIds = normalizedIds.filter((id) => !existingIds.has(id));
+    if (missingIds.length > 0) {
+      throw new NotFoundError("Article", missingIds.join(","));
+    }
+
+    const deletedRows = await newsRepo.deleteMany(normalizedIds);
+    const deletedIds = deletedRows.map((row) => row.id);
+
+    for (const articleId of deletedIds) {
+      try {
+        await deleteArticleEmbedding(articleId);
+      } catch (error) {
+        console.error(`[vector-index] failed to delete embedding for article ${articleId}`, error);
+        await logVectorDlq({
+          operation: "delete",
+          articleId,
+          reason: error instanceof Error ? error.message : "unknown indexing error",
+          context: {
+            phase: "bulk-delete"
+          }
+        });
+      }
+    }
+
+    return {
+      deletedCount: deletedIds.length
+    };
+  },
+
+  async bulkUpdateCategory(ids: number[], categoryId: number) {
+    const normalizedIds = Array.from(new Set(ids.map((id) => Number(id)).filter((id) => Number.isInteger(id) && id > 0)));
+    if (normalizedIds.length === 0) {
+      throw new ValidationError("Validation failed", [
+        {
+          field: "body.ids",
+          message: "ids must include at least one positive integer"
+        }
+      ]);
+    }
+
+    await assertCategoryExists(categoryId);
+
+    const existing = await newsRepo.findByIds(normalizedIds);
+    const existingIds = new Set(existing.map((item) => item.id));
+    const missingIds = normalizedIds.filter((id) => !existingIds.has(id));
+    if (missingIds.length > 0) {
+      throw new NotFoundError("Article", missingIds.join(","));
+    }
+
+    const updated = await newsRepo.updateCategoryMany(normalizedIds, categoryId);
+    const category = await categoryService.getById(categoryId);
+
+    for (const article of updated) {
+      try {
+        await upsertArticleEmbedding({
+          id: article.id,
+          title: article.title,
+          summary: article.summary,
+          content: article.content,
+          publishedAt: article.publishedAt,
+          categorySlug: category.slug
+        });
+      } catch (error) {
+        console.error(`[vector-index] failed to upsert embedding for article ${article.id}`, error);
+        await logVectorDlq({
+          operation: "upsert",
+          articleId: article.id,
+          reason: error instanceof Error ? error.message : "unknown indexing error",
+          context: {
+            phase: "bulk-category"
+          }
+        });
+      }
+    }
+
+    return {
+      updatedCount: updated.length
+    };
   }
 };

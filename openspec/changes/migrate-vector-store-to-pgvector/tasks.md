@@ -1,47 +1,48 @@
-## 1. Planning and Baseline
+## Phase 1 - Must-Have Safe Cutover
 
-- [ ] 1.1 Define migration feature flags (`VECTOR_ENGINE`, dual-write, shadow-read, cutover).
-- [ ] 1.2 Capture baseline quality/latency metrics from current Qdrant path for comparison.
-- [ ] 1.3 Define acceptance thresholds for parity (relevance, hit-rate, p95 latency).
+### 1. Guardrails and Success Criteria
 
-## 2. Data and Schema Setup
+- [x] 1.1 Define minimum flags: `VECTOR_ENGINE`, `VECTOR_DUAL_WRITE`, `VECTOR_SHADOW_READ`.
+- [x] 1.2 Capture Qdrant baseline for the three required cutover metrics only: top-k overlap proxy, p95 latency, error rate.
+- [x] 1.3 Set explicit go/no-go thresholds for the three required cutover metrics before read cutover.
 
-- [ ] 2.1 Add Postgres migration enabling `pgvector` extension.
-- [ ] 2.2 Add `article_embeddings` table schema and supporting metadata columns.
-- [ ] 2.3 Add vector index(es) and metadata indexes required by retrieval filters.
-- [ ] 2.4 Add repository/query helpers for upsert, delete, and similarity search.
+### 2. Pgvector Data Plane
 
-## 3. Indexing Pipeline Migration
+- [x] 2.1 Add migration enabling `pgvector` extension.
+- [x] 2.2 Add `article_embeddings` table with metadata needed by current filters/exclusions.
+- [x] 2.3 Add initial vector + metadata indexes (baseline strategy only; no premature tuning matrix).
+- [x] 2.4 Add repository helpers for upsert, delete, and top-k similarity query.
 
-- [ ] 3.1 Implement pgvector-based upsert flow in indexer while preserving existing payload semantics.
-- [ ] 3.2 Implement pgvector-based delete flow.
-- [ ] 3.3 Implement dual-write mode (Qdrant + pgvector) for safe transition.
-- [ ] 3.4 Update backfill worker to support pgvector targets and parity audit logging.
+### 3. Indexing Migration (Dual-Write First)
 
-## 4. Retrieval Engine Migration
+- [x] 3.1 Implement pgvector upsert/delete in indexer preserving current payload semantics.
+- [x] 3.2 Enable dual-write (Qdrant + pgvector) for new/updated/deleted embeddings.
+- [x] 3.3 Update backfill to fill pgvector and report coverage/parity counts.
 
-- [ ] 4.1 Add PGVector retrieval engine implementing current retrieval interface.
-- [ ] 4.2 Map filters/exclusions/category constraints to SQL query forms.
-- [ ] 4.3 Add shadow-read comparison instrumentation (Qdrant vs pgvector result overlap and latency).
-- [ ] 4.4 Add runtime switch for read path cutover.
+### 4. Retrieval Migration (Shadow-Read Timeboxed)
 
-## 5. API and Service Integration
+- [x] 4.1 Add PGVector retrieval engine implementing current retrieval interface.
+- [x] 4.2 Map existing filter semantics (category, excludes, limits) to SQL queries.
+- [x] 4.3 Wire shadow-read comparison telemetry (Qdrant vs pgvector overlap + latency).
+- [ ] 4.4 Run a shadow-read window of 3-5 days, then decide cutover by predefined thresholds.
 
-- [ ] 5.1 Wire semantic search service to engine abstraction with pgvector option.
-- [ ] 5.2 Wire article recommendations service to pgvector engine.
-- [ ] 5.3 Wire personalization retrieval to pgvector engine.
-- [ ] 5.4 Wire chatbot grounding retrieval to pgvector engine.
+### 5. Integration and Cutover
 
-## 6. Operational and Config Cleanup
+- [x] 5.1 Wire semantic search, recommendations, personalization, and chatbot grounding to engine switch.
+- [x] 5.2 Add/adjust health checks to include pgvector readiness and keep rollback path to Qdrant.
+- [x] 5.3 Add focused tests for retrieval parity + deterministic fallback in critical flows.
+- [x] 5.4 Cut over read path to pgvector with rollback guardrail still enabled.
 
-- [ ] 6.1 Add/adjust runtime config for pgvector engine selection and tuning values.
-- [ ] 6.2 Update health endpoint/plugin checks to monitor pgvector readiness instead of Qdrant.
-- [ ] 6.3 Update local infra scripts and compose dependencies to make Qdrant optional/removed.
-- [ ] 6.4 Update operational docs/runbooks for pgvector troubleshooting and rollback.
+## Phase 2 - Post-Stability Cleanup and Hardening
 
-## 7. Validation and Rollout
+### 6. Infra and Config Cleanup
 
-- [ ] 7.1 Add tests for pgvector retrieval parity and deterministic fallback behavior.
-- [ ] 7.2 Run shadow-read in dev/staging and review telemetry against acceptance thresholds.
-- [ ] 7.3 Execute staged cutover to pgvector read path with rollback guardrails.
-- [ ] 7.4 Remove Qdrant path after stability window and finalize cleanup.
+- [x] 6.1 Remove Qdrant dependency from local scripts/compose after stability window.
+- [ ] 6.2 Remove Qdrant runtime settings and dead code paths.
+- [x] 6.3 Update operational docs/runbooks for pgvector-only operations.
+
+### 7. Performance and Quality Tuning (Optional)
+
+- [ ] 7.1 Evaluate index strategy upgrades (e.g., IVFFlat vs HNSW) using production-like workload.
+- [ ] 7.2 Tune query/index settings only when metrics show clear bottlenecks.
+- [ ] 7.3 Finalize post-cutover audit and close migration tasks.

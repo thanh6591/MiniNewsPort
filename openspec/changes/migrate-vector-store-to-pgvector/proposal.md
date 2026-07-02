@@ -7,8 +7,10 @@ Current AI retrieval features rely on Qdrant as a separate vector service. This 
 - Replace Qdrant-backed vector storage with Postgres `pgvector` for article embeddings.
 - Introduce a Postgres vector repository/engine implementing current retrieval contracts (`search`, `similar`, `recommendForUser`, `retrieveContext`).
 - Migrate embedding upsert/delete flows from Qdrant HTTP calls to SQL operations.
-- Update health checks, runtime config, docs, and local infra scripts to remove Qdrant dependency.
-- Add migration and rollout strategy using dual-write/shadow-read phases to reduce risk.
+- Execute migration in two phases:
+	- Phase 1 - Must-Have Safe Cutover: dual-write, shadow-read window (3-5 days), read cutover with rollback guardrail.
+	- Phase 2 - Post-Stability Cleanup and Hardening: remove Qdrant dependency and complete non-critical tuning.
+- Use explicit go/no-go criteria for read cutover based on the three required cutover metrics: top-k overlap proxy, p95 latency, and error rate.
 
 ## Capabilities
 
@@ -20,8 +22,8 @@ Current AI retrieval features rely on Qdrant as a separate vector service. This 
 - `article-embedding-indexing`: Index lifecycle operations move from Qdrant collection/points operations to Postgres vector table/index operations.
 
 ### Operational Changes
-- Remove Qdrant runtime flags and health dependencies.
-- Add Postgres vector extension/table/index management and observability thresholds.
+- Add Postgres vector extension/table/index management and migration telemetry.
+- Keep Qdrant rollback path during cutover; remove Qdrant runtime flags/health dependencies only after the stability window.
 
 ## Impact
 
@@ -29,6 +31,16 @@ Current AI retrieval features rely on Qdrant as a separate vector service. This 
 - Affected data: article embedding persistence location and retrieval query plans.
 - Dependencies: PostgreSQL extension `vector` (`pgvector`), index strategy selection (HNSW or IVFFlat), query/operator tuning, and fallback policy.
 - Risk areas: retrieval relevance parity, latency regressions under load, and migration consistency.
+
+## Rollout Shape
+
+- Phase 1 target: safe cutover with constrained scope and bounded shadow-read window (3-5 days).
+- Phase 2 target: irreversible cleanup and optional performance tuning only after Phase 1 stability confirmation.
+
+## Success Criteria
+
+- Read cutover is approved only when predeclared thresholds for the three required cutover metrics are met.
+- Rollback from pgvector read path to Qdrant can be executed by flag without data loss.
 
 ## Out of Scope
 

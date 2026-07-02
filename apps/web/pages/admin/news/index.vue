@@ -13,6 +13,53 @@
       </p>
     </div>
 
+    <div
+      v-if="news.length > 0"
+      class="flex flex-wrap items-end gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+    >
+      <div class="flex items-center gap-2">
+        <input
+          id="select-all-news"
+          type="checkbox"
+          :checked="allVisibleSelected"
+          class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          @change="toggleSelectAllVisible"
+        />
+        <label for="select-all-news" class="text-sm text-slate-700">Select all on page</label>
+      </div>
+
+      <span class="text-sm text-slate-500">{{ selectedIds.length }} selected</span>
+
+      <div class="ml-auto flex flex-wrap items-end gap-2">
+        <div class="flex flex-col gap-1">
+          <label class="text-xs font-medium text-slate-600">Change category to</label>
+          <select
+            v-model="bulkCategoryId"
+            class="rounded border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option :value="null" disabled>Select category</option>
+            <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
+          </select>
+        </div>
+
+        <button
+          class="rounded bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-amber-700 disabled:opacity-50"
+          :disabled="bulkProcessing || selectedIds.length === 0 || bulkCategoryId == null"
+          @click="bulkChangeCategory"
+        >
+          {{ bulkProcessing ? 'Processing…' : 'Update category' }}
+        </button>
+
+        <button
+          class="rounded bg-red-600 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-red-700 disabled:opacity-50"
+          :disabled="bulkProcessing || selectedIds.length === 0"
+          @click="bulkDelete"
+        >
+          {{ bulkProcessing ? 'Processing…' : 'Delete selected' }}
+        </button>
+      </div>
+    </div>
+
     <!-- Filters -->
     <div class="flex flex-wrap gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div class="flex flex-col gap-1">
@@ -55,6 +102,16 @@
         :key="item.id"
         class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-start sm:justify-between"
       >
+        <div class="flex items-start pt-1">
+          <input
+            :id="`select-news-${item.id}`"
+            type="checkbox"
+            :checked="selectedSet.has(item.id)"
+            class="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+            @change="toggleItemSelection(item.id)"
+          />
+        </div>
+
         <!-- Thumbnail -->
         <div class="hidden shrink-0 sm:block">
           <img
@@ -165,8 +222,18 @@ const news = computed(() => newsData.value?.items ?? []);
 const total = computed(() => newsData.value?.total ?? 0);
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / LIMIT)));
 const categories = computed(() => categoriesData.value?.items ?? []);
+const selectedSet = ref<Set<number>>(new Set());
+const bulkCategoryId = ref<number | null>(null);
+const bulkProcessing = ref(false);
+
+const selectedIds = computed(() => Array.from(selectedSet.value));
+const allVisibleSelected = computed(() => news.value.length > 0 && news.value.every((item) => selectedSet.value.has(item.id)));
 
 watch([filterCategory, filterStatus], () => { page.value = 1; });
+watch(news, (items) => {
+  const visibleIds = new Set(items.map((item) => item.id));
+  selectedSet.value = new Set(Array.from(selectedSet.value).filter((id) => visibleIds.has(id)));
+});
 
 function resetFilters() {
   filterCategory.value = "";
@@ -174,10 +241,77 @@ function resetFilters() {
   page.value = 1;
 }
 
+function toggleItemSelection(id: number) {
+  const next = new Set(selectedSet.value);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  selectedSet.value = next;
+}
+
+function toggleSelectAllVisible(event: Event) {
+  const checked = (event.target as HTMLInputElement).checked;
+  if (!checked) {
+    selectedSet.value = new Set();
+    return;
+  }
+
+  selectedSet.value = new Set(news.value.map((item) => item.id));
+}
+
+function clearSelection() {
+  selectedSet.value = new Set();
+}
+
 async function deleteNews(id: number) {
   if (confirm("Delete this news?")) {
     await $fetch(`/api/admin/news/${id}`, { method: "DELETE" });
     refresh();
+  }
+}
+
+async function bulkDelete() {
+  if (selectedIds.value.length === 0) {
+    return;
+  }
+
+  if (!confirm(`Delete ${selectedIds.value.length} selected article(s)?`)) {
+    return;
+  }
+
+  bulkProcessing.value = true;
+  try {
+    await $fetch("/api/admin/news/bulk-delete", {
+      method: "POST",
+      body: { ids: selectedIds.value }
+    });
+    clearSelection();
+    await refresh();
+  } finally {
+    bulkProcessing.value = false;
+  }
+}
+
+async function bulkChangeCategory() {
+  if (selectedIds.value.length === 0 || bulkCategoryId.value == null) {
+    return;
+  }
+
+  bulkProcessing.value = true;
+  try {
+    await $fetch("/api/admin/news/bulk-category", {
+      method: "PUT",
+      body: {
+        ids: selectedIds.value,
+        categoryId: bulkCategoryId.value
+      }
+    });
+    clearSelection();
+    await refresh();
+  } finally {
+    bulkProcessing.value = false;
   }
 }
 </script>

@@ -57,7 +57,7 @@ onMounted(async () => {
 
   const newsByCategory = await Promise.all(
     categories.value.map(async (cat) => {
-      const data = await fetchJson<{ items: News[] }>(`/api/news?categoryId=${cat.id}&limit=5`).catch(() => ({ items: [] }));
+      const data = await fetchJson<{ items: News[] }>(`/api/news?categoryId=${cat.id}&limit=6`).catch(() => ({ items: [] }));
 
       return [cat.id, data.items || []] as const;
     })

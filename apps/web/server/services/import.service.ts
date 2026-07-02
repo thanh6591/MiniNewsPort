@@ -10,6 +10,7 @@ import { CategoryNotFoundError, NotFoundError, ValidationError } from "./errors"
 export type BulkImportSubmitInput = {
   urls: string[];
   categoryId: number;
+  autoCategory?: boolean;
 };
 
 export type BulkImportResult = {
@@ -20,6 +21,8 @@ export type BulkImportResult = {
 
 export const importService = {
   async submitBulk(input: BulkImportSubmitInput): Promise<BulkImportResult> {
+    const autoCategory = input.autoCategory !== false;
+
     if (!Array.isArray(input.urls) || input.urls.length === 0) {
       throw new ValidationError("urls is required", [{ field: "body.urls", message: "At least one URL is required" }]);
     }
@@ -76,6 +79,7 @@ export const importService = {
         importItemId: item.id,
         batchId: batch.id,
         categoryId: input.categoryId,
+        autoCategory,
         sourceUrl: item.sourceUrl,
         sourceDomain: item.sourceDomain
       };
